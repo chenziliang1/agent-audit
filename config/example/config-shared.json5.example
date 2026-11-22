@@ -1,0 +1,18 @@
+// Copy to config/config-shared.json5. Values here are placeholders; only the shape matters.
+// Settings shared by every environment. Overridden by config-<env>.json5.
+{
+  // Every AWS resource name derives from this, such as the stack name prefix.
+  project_name: "my_project",
+  // The AgentCore CLI project name: a letter, then letters and digits, at most 23 characters.
+  agentcore_project_name: "MyProject",
+  // The Claude model of the AuditAgent, called on the Anthropic API with the anthropic_api_key
+  // of the -secret file; override it per environment if needed.
+  audit_agent_model_id: "claude-sonnet-5-5",
+  // The model a call is made again on when audit_agent_model_id refuses it and the Anthropic API
+  // returns the refusal instead of falling back by itself. For a "cyber" refusal of
+  // claude-sonnet-5-5 the API falls back to claude-sonnet-5, so this names the same model.
+  audit_agent_fallback_model_id: "claude-sonnet-5",
+  // The Vercel project that hosts the web app. Only its production deployments may assume the
+  // role of the web-invoker stack; the team's slug, vercel_team_slug, is in the -secret file.
+  vercel_project_name: "my-project",
+}

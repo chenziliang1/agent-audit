@@ -1,0 +1,80 @@
+{
+  "company": "Daugherty Inc",
+  "primary_domain": "daugherty.ai",
+  "internal_domains": [
+    "daugherty.ai",
+    "corp.daugherty.ai",
+    "internal.daugherty.ai"
+  ],
+  "partner_domains": [
+    "herzog-partners.com",
+    "terryconsulting.com"
+  ],
+  "allowlisted_external_domains": [
+    "github.com",
+    "api.github.com",
+    "pypi.org",
+    "files.pythonhosted.org",
+    "registry.npmjs.org",
+    "api.stripe.com",
+    "slack.com",
+    "docs.python.org",
+    "kubernetes.io",
+    "developer.mozilla.org",
+    "en.wikipedia.org",
+    "arxiv.org"
+  ],
+  "refund_limit_usd": 200,
+  "payout_approval_threshold_usd": 10000,
+  "runaway_loop_threshold": 20,
+  "verified_vendors": [
+    {
+      "vendor_id": "VEN-1000",
+      "name": "Streich Group",
+      "iban": "MU03PRCX8678716920071858846UCY",
+      "verified": true
+    },
+    {
+      "vendor_id": "VEN-1001",
+      "name": "Howell Group",
+      "iban": "PL29908146651494181292193382",
+      "verified": true
+    },
+    {
+      "vendor_id": "VEN-1002",
+      "name": "Schmidt-Cassin",
+      "iban": "CH30489280GH3XYDVQ5F4",
+      "verified": true
+    },
+    {
+      "vendor_id": "VEN-1003",
+      "name": "Kunde and Sons",
+      "iban": "IE30CJLZ20994967436972",
+      "verified": true
+    },
+    {
+      "vendor_id": "VEN-1004",
+      "name": "Zieme Group",
+      "iban": "DE55141104835182309635",
+      "verified": true
+    },
+    {
+      "vendor_id": "VEN-1005",
+      "name": "Schroeder-Gusikowski",
+      "iban": "CF4493418343167178612002353",
+      "verified": true
+    },
+    {
+      "vendor_id": "VEN-1006",
+      "name": "Carroll, Greenholt and Schuster",
+      "iban": "CM7102010203468906761220257",
+      "verified": true
+    },
+    {
+      "vendor_id": "VEN-1007",
+      "name": "Jerde-Howe",
+      "iban": "FI7445342411853688",
+      "verified": true
+    }
+  ]
+}

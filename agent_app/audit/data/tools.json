@@ -1,0 +1,398 @@
+[
+  {
+    "name": "ticket.get",
+    "side_effect": "read",
+    "description": "Fetch a support/helpdesk ticket including the customer-written body.",
+    "parameters": {
+      "ticket_id": "string"
+    }
+  },
+  {
+    "name": "ticket.update",
+    "side_effect": "write",
+    "description": "Update ticket status, tags or add an internal note.",
+    "parameters": {
+      "ticket_id": "string",
+      "status": "string",
+      "internal_note": "string"
+    }
+  },
+  {
+    "name": "crm.lookup_customer",
+    "side_effect": "read",
+    "description": "Get one customer's profile and recent orders.",
+    "parameters": {
+      "customer_id": "string",
+      "fields": "string[]"
+    }
+  },
+  {
+    "name": "crm.search_customers",
+    "side_effect": "read",
+    "description": "Search customers by filter; can return many records.",
+    "parameters": {
+      "filter": "string",
+      "fields": "string[]",
+      "limit": "int",
+      "export_format": "string?"
+    }
+  },
+  {
+    "name": "kb.search",
+    "side_effect": "read",
+    "description": "Search the internal knowledge base.",
+    "parameters": {
+      "query": "string"
+    }
+  },
+  {
+    "name": "email.read",
+    "side_effect": "read",
+    "description": "Read messages from the mailbox the agent operates on.",
+    "parameters": {
+      "folder": "string",
+      "limit": "int",
+      "query": "string?"
+    }
+  },
+  {
+    "name": "email.send",
+    "side_effect": "external",
+    "description": "Send an email.",
+    "parameters": {
+      "to": "string[]",
+      "cc": "string[]?",
+      "subject": "string",
+      "body": "string",
+      "attachments": "string[]?"
+    }
+  },
+  {
+    "name": "email.create_rule",
+    "side_effect": "write",
+    "description": "Create a mailbox rule (filter / forward / auto-reply).",
+    "parameters": {
+      "name": "string",
+      "condition": "object",
+      "action": "object"
+    }
+  },
+  {
+    "name": "payments.refund",
+    "side_effect": "financial",
+    "description": "Refund (part of) an order.",
+    "parameters": {
+      "order_id": "string",
+      "amount": "number",
+      "currency": "string",
+      "reason": "string"
+    }
+  },
+  {
+    "name": "payments.create_payout",
+    "side_effect": "financial",
+    "description": "Send money to a vendor bank account.",
+    "parameters": {
+      "vendor_id": "string",
+      "iban": "string",
+      "amount": "number",
+      "currency": "string",
+      "reference": "string"
+    }
+  },
+  {
+    "name": "slack.post_message",
+    "side_effect": "external",
+    "description": "Post a message to a Slack channel.",
+    "parameters": {
+      "channel": "string",
+      "text": "string"
+    }
+  },
+  {
+    "name": "shell.exec",
+    "side_effect": "write",
+    "description": "Run a shell command on the agent's host / runner.",
+    "parameters": {
+      "command": "string",
+      "cwd": "string",
+      "timeout_s": "int?"
+    }
+  },
+  {
+    "name": "k8s.kubectl",
+    "side_effect": "write",
+    "description": "Run kubectl against a cluster.",
+    "parameters": {
+      "cluster": "string",
+      "args": "string"
+    }
+  },
+  {
+    "name": "fs.read",
+    "side_effect": "read",
+    "description": "Read a file.",
+    "parameters": {
+      "path": "string"
+    }
+  },
+  {
+    "name": "fs.write",
+    "side_effect": "write",
+    "description": "Write / overwrite a file.",
+    "parameters": {
+      "path": "string",
+      "content": "string"
+    }
+  },
+  {
+    "name": "secrets.get",
+    "side_effect": "sensitive",
+    "description": "Read a secret value from the vault.",
+    "parameters": {
+      "name": "string"
+    }
+  },
+  {
+    "name": "http.request",
+    "side_effect": "external",
+    "description": "Make an arbitrary HTTP request.",
+    "parameters": {
+      "method": "string",
+      "url": "string",
+      "headers": "object?",
+      "body": "string?"
+    }
+  },
+  {
+    "name": "cloud.iam.update_policy",
+    "side_effect": "privileged",
+    "description": "Add/remove an IAM role binding.",
+    "parameters": {
+      "principal": "string",
+      "role": "string",
+      "resource": "string",
+      "action": "add|remove"
+    }
+  },
+  {
+    "name": "cloud.network.update_firewall",
+    "side_effect": "privileged",
+    "description": "Create or modify a firewall / security-group rule.",
+    "parameters": {
+      "rule_name": "string",
+      "direction": "string",
+      "protocol": "string",
+      "ports": "string",
+      "source_ranges": "string[]",
+      "target": "string"
+    }
+  },
+  {
+    "name": "cloud.logging.update_sink",
+    "side_effect": "privileged",
+    "description": "Configure a log sink (e.g. audit logs).",
+    "parameters": {
+      "sink": "string",
+      "enabled": "bool",
+      "filter": "string?"
+    }
+  },
+  {
+    "name": "db.query",
+    "side_effect": "read/write",
+    "description": "Run SQL against a database.",
+    "parameters": {
+      "database": "string",
+      "sql": "string"
+    }
+  },
+  {
+    "name": "code.execute",
+    "side_effect": "write",
+    "description": "Execute code in a sandboxed notebook kernel.",
+    "parameters": {
+      "language": "string",
+      "code": "string"
+    }
+  },
+  {
+    "name": "storage.upload",
+    "side_effect": "write",
+    "description": "Upload a file to object storage.",
+    "parameters": {
+      "bucket": "string",
+      "key": "string",
+      "source_path": "string"
+    }
+  },
+  {
+    "name": "storage.set_acl",
+    "side_effect": "privileged",
+    "description": "Change object/bucket ACL.",
+    "parameters": {
+      "bucket": "string",
+      "key": "string?",
+      "acl": "string"
+    }
+  },
+  {
+    "name": "git.clone",
+    "side_effect": "read",
+    "description": "Clone a repository.",
+    "parameters": {
+      "repo": "string",
+      "branch": "string"
+    }
+  },
+  {
+    "name": "git.commit",
+    "side_effect": "write",
+    "description": "Commit staged changes.",
+    "parameters": {
+      "repo": "string",
+      "message": "string",
+      "files": "string[]"
+    }
+  },
+  {
+    "name": "git.push",
+    "side_effect": "write",
+    "description": "Push a branch to the remote.",
+    "parameters": {
+      "repo": "string",
+      "branch": "string",
+      "force": "bool"
+    }
+  },
+  {
+    "name": "github.create_pr",
+    "side_effect": "write",
+    "description": "Open a pull request.",
+    "parameters": {
+      "repo": "string",
+      "head": "string",
+      "base": "string",
+      "title": "string",
+      "body": "string"
+    }
+  },
+  {
+    "name": "package.install",
+    "side_effect": "write",
+    "description": "Install a package with a package manager.",
+    "parameters": {
+      "manager": "string",
+      "name": "string",
+      "version": "string?"
+    }
+  },
+  {
+    "name": "web.search",
+    "side_effect": "read",
+    "description": "Search the public web.",
+    "parameters": {
+      "query": "string"
+    }
+  },
+  {
+    "name": "web.fetch",
+    "side_effect": "read",
+    "description": "Fetch a URL and return its text content.",
+    "parameters": {
+      "url": "string"
+    }
+  },
+  {
+    "name": "calendar.create_event",
+    "side_effect": "write",
+    "description": "Create a calendar event and invite attendees.",
+    "parameters": {
+      "title": "string",
+      "start": "string",
+      "end": "string",
+      "attendees": "string[]"
+    }
+  },
+  {
+    "name": "contacts.lookup",
+    "side_effect": "read",
+    "description": "Look up a person in the directory.",
+    "parameters": {
+      "query": "string"
+    }
+  },
+  {
+    "name": "drive.search",
+    "side_effect": "read",
+    "description": "Search shared drive documents.",
+    "parameters": {
+      "query": "string"
+    }
+  },
+  {
+    "name": "drive.share",
+    "side_effect": "external",
+    "description": "Share a drive file or folder.",
+    "parameters": {
+      "file_id": "string",
+      "with": "string",
+      "role": "string",
+      "visibility": "string"
+    }
+  },
+  {
+    "name": "erp.query",
+    "side_effect": "read",
+    "description": "Query the ERP (invoices, vendors, POs).",
+    "parameters": {
+      "entity": "string",
+      "filter": "string"
+    }
+  },
+  {
+    "name": "erp.update_vendor",
+    "side_effect": "write",
+    "description": "Update vendor master data (incl. bank details).",
+    "parameters": {
+      "vendor_id": "string",
+      "changes": "object"
+    }
+  },
+  {
+    "name": "hris.get_employee",
+    "side_effect": "read",
+    "description": "Read an employee record from the HR system.",
+    "parameters": {
+      "employee_id": "string"
+    }
+  },
+  {
+    "name": "iam.create_user",
+    "side_effect": "privileged",
+    "description": "Create a corporate identity account.",
+    "parameters": {
+      "username": "string",
+      "email": "string",
+      "department": "string"
+    }
+  },
+  {
+    "name": "iam.add_to_group",
+    "side_effect": "privileged",
+    "description": "Add a user to an access group.",
+    "parameters": {
+      "username": "string",
+      "group": "string"
+    }
+  },
+  {
+    "name": "iam.update_user",
+    "side_effect": "privileged",
+    "description": "Update a user's security settings.",
+    "parameters": {
+      "username": "string",
+      "changes": "object"
+    }
+  }
+]

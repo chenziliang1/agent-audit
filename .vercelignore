@@ -1,0 +1,21 @@
+# What `vercel deploy` uploads. The Vercel CLI does NOT read .gitignore: without
+# this file it would upload everything in the directory except a short built-in
+# list, including .env and config/config-*-secret.json5 (the Anthropic API key).
+#
+# So this is an allowlist: ignore everything at the root, then name what the
+# Next.js build needs. A new top-level file or folder the build reads must be
+# added here, or the build on Vercel fails for a missing module.
+/*
+!/app
+!/components
+!/hooks
+!/lib
+!/data
+!/instrumentation-client.ts
+!/next.config.js
+!/package.json
+!/pnpm-lock.yaml
+!/postcss.config.mjs
+!/tailwind.config.ts
+!/tsconfig.json
+!/vercel.json

@@ -1,0 +1,78 @@
+# [project] table: https://packaging.python.org/en/latest/guides/writing-pyproject-toml/
+[project]
+name = "agent_app"
+version = "0.2.0"
+description = "An agent that audits other agents' tool use for security risk: MCP server and agent runtimes on AWS Bedrock AgentCore, behind a Next.js frontend."
+requires-python = ">=3.11,<4.0"
+
+# --- Dependencies ---
+# Edit these lists, then ``mise run inst`` to update ``uv.lock`` and ``.venv``.
+# These are what a developer machine needs (CDK, config files, deploy tooling).
+# What runs inside an AgentCore Runtime is the ``agentcore`` group below.
+dependencies = [
+    "aws-cdk-lib>=2.273.0,<3.0.0", # AWS CDK constructs, synthesized to CloudFormation
+    "boto3>=1.42.97,<2.0.0", # AWS SDK, behind one.boto_ses
+    "boto-session-manager>=2.1.1,<3.0.0", # the boto session of the current environment, one.bsm
+    "cdk-mate>=1.0.0,<2.0.0", # run the cdk CLI from Python with an environment's boto session
+    "json5>=0.17.3,<1.0.0", # parse the config/*.json5 files (comments allowed)
+    "pydantic>=2.14.1,<3.0.0", # validate the Config model
+    "simple-aws-ssm-parameter-store>=0.3.0,<1.0.0", # write the config to SSM only when it changed
+]
+
+# --- Optional dependencies (extras) ---
+[project.optional-dependencies]
+
+# tests and coverage
+test = [
+    "pytest>=9.1.1,<10.0.0",
+    "pytest-cov>=7.1.0,<8.0.0",
+    "moto>=5.1.21,<6.0.0", # mock AWS services (SSM) in tests
+]
+
+# --- Dependency groups ---
+# Read: https://docs.astral.sh/uv/concepts/projects/dependencies/#dependency-groups
+[dependency-groups]
+
+# Code that runs inside the AgentCore Runtimes (MCP server, agent). One set for every runtime.
+# A group, not an extra, so ``uv export --only-group agentcore`` emits these (pinned by uv.lock)
+# without the base dependencies above, which stay on the dev machine (aws-cdk-lib and others).
+agentcore = [
+    "aws-opentelemetry-distro>=0.22.0,<1.0.0", # AgentCore observability; in the CLI templates
+    "bedrock-agentcore[strands-agents]>=1.25.2,<2.0.0", # BedrockAgentCoreApp, the agent runtime's HTTP server
+    "boto-session-manager>=2.1.1,<3.0.0", # one.bsm, the runtime's boto session
+    "botocore[crt]>=1.43.0,<2.0.0", # in the CLI agent template; crt for SigV4 and faster transfers
+    "mcp>=1.28.1,<2.0.0", # FastMCP server and client; bedrock-agentcore[strands-agents] needs mcp<2
+    "pydantic>=2.14.1,<3.0.0", # the Config model, read from SSM
+    "simple-aws-ssm-parameter-store>=0.3.0,<1.0.0", # read the config from SSM
+    "strands-agents[anthropic]>=1.63.0,<2.0.0", # the agent framework; the anthropic extra is the Claude API client the AuditAgent calls its model with
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "agent_app*",
+]
+exclude = [
+    "agent_app.tests",
+    "agent_app.tests.*",
+]
+
+# --- ruff: ``mise run format`` / ``mise run lint`` ---
+[tool.ruff]
+extend-exclude = [
+    "agent_app/vendor",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# re-export modules
+"**/__init__.py" = ["F401"]
+"**/api.py" = ["F401"]
+
+# --- pytest 9+ native table ---
+# Read: https://docs.pytest.org/en/stable/reference/customize.html#pyproject-toml
+[tool.pytest]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=77.0"]
+build-backend = "setuptools.build_meta"

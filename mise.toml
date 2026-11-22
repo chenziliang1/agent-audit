@@ -1,0 +1,1204 @@
+# See claude code environment variables documents at https://code.claude.com/docs/en/settings
+[env]
+# Make uv use the mise Python below (first ``python`` on PATH), not a uv-managed one
+# or a global ``~/.config/uv/.python-version`` pin. ``[tools] python`` is the one dev version.
+UV_PYTHON = "python"
+# Local, per-person settings; copy .env.example to .env (git-ignored) and fill in:
+# - ENV_NAME: the current environment (dev, tst, prd) of one.config / one.bsm; default dev.
+# - AWS_PROFILE_FOR_DEV, AWS_PROFILE_FOR_TST, AWS_PROFILE_FOR_PRD: the AWS CLI profile of
+#   each environment; one.bsm uses it locally, the generated cdk-* tasks pass it as
+#   --profile, the generated AgentCore tasks as AWS_PROFILE.
+_.file = ".env"
+
+[tools]
+python = "3.12" # the dev Python, and the Python of the AgentCore runtimes
+uv = "latest"
+claude = "latest"
+node = "24" # Next.js, and the runtime of the cdk CLI and of aws-cdk-lib (jsii)
+pnpm = "latest"
+awscli = "2.34.24"
+"npm:aws-cdk" = "2.1145.0" # the cdk CLI; must be new enough for the aws-cdk-lib in uv.lock
+"npm:@aws/agentcore" = "1.0.1" # the AgentCore CLI; deploys the agentcore/ project (Runtimes)
+
+# === Tasks ===
+# Python Environment Management
+[tasks.venv-create]
+description = "🐍 Create Python virtual environment using uv (creates .venv directory)"
+run = "uv venv --allow-existing"
+
+[tasks.venv-remove]
+description = "🗑️ Remove Python virtual environment (deletes .venv directory)"
+run = "rm -r .venv"
+
+# Dependency Management
+#
+# ``inst`` is the Python half only, on purpose: every generated task below depends on
+# it, and none of them needs node_modules. ``inst-all`` is what a fresh checkout runs.
+[tasks.inst]
+description = "💾 Install all Python dependencies using uv (syncs from pyproject.toml and uv.lock)"
+depends = ["venv-create"]
+run = "uv sync --all-extras --all-groups"
+
+[tasks.inst-node-deps]
+description = "📦 Install Node.js dependencies via pnpm"
+run = "pnpm install"
+
+[tasks.inst-all]
+description = "💾 Install everything a fresh checkout needs (Python + Node.js)"
+depends = ["inst", "inst-node-deps"]
+
+# Testing
+[tasks.test-python]
+description = "🧪 Run Python unit tests using pytest"
+run = ".venv/bin/pytest tests"
+depends = ["inst"]
+
+[tasks.test-node]
+description = "🧪 Run Node.js tests"
+run = "node --test tests_node/*.test.js"
+
+[tasks.test]
+description = "🧪 Run all unit tests (Python + Node.js)"
+depends = ["test-python", "test-node"]
+
+[tasks.cov]
+description = "🧪📊 Run Python unit tests with code coverage using pytest (generates HTML report in htmlcov/)"
+run = ".venv/bin/pytest tests -s --tb=native --cov=agent_app --cov-report term-missing --cov-report html:htmlcov"
+depends = ["inst"]
+
+[tasks.int-test]
+description = "🧪☁️ Run integration tests against the stacks deployed in ENV_NAME (default dev), e.g. ENV_NAME=prd mise run int-test"
+run = ".venv/bin/pytest tests_int -s --tb=native"
+depends = ["inst"]
+
+[tasks.view-cov]
+description = "👀📊 Open code coverage HTML report in browser (requires 'cov' task to run first)"
+run = "open htmlcov/index.html"
+
+# Code Quality
+[tasks.format]
+description = "🎨 Format all Python code with ruff (package, tests, CDK app, mise task scripts)"
+run = "uvx ruff format agent_app tests tests_int cdk .mise/tasks"
+
+[tasks.lint]
+description = "🔍 Lint Python code with ruff (unused/undefined names)"
+run = "uvx ruff check --select F401,F821,F841 agent_app tests tests_int cdk .mise/tasks"
+
+# AgentCore, local (no AWS). The per-runtime tasks ac-local-<slug>, ac-dev-<slug>, and
+# ac-local-<slug>-call are generated (gen-env-tasks), with each runtime's local port.
+[tasks.free-port]
+description = "🧹 Stop this repo's leftover server on a port: mise run free-port --port <port> (never stops a process outside this repo)"
+run = ".venv/bin/python .mise/tasks/free-port.py"
+
+# The audit dataset is generated outside this repository; this copies its inputs in.
+[tasks.sync-audit-data]
+description = "📥 Copy the audit dataset's inputs (never its labels) into agent_app/audit/data/: mise run sync-audit-data [--source <dir>], default ../datafaker/out"
+run = ".venv/bin/python .mise/tasks/sync-audit-data.py"
+depends = ["inst"]
+
+# Evaluation: the agent audits a dataset's sessions, then the dataset's own evaluate.py scores it.
+[tasks.eval-run]
+description = "💸 Audit a dataset's sessions with the local agent, one conversation each (calls the model: every session is paid for): mise run eval-run --source <dataset dir> --name <run> --max-cost <usd> [--sample N] [--drop-intent]"
+run = ".venv/bin/python .mise/tasks/eval-run.py"
+depends = ["inst"]
+
+[tasks.eval-score]
+description = "📊 Score a run of eval-run with the dataset's evaluate.py (reads the labels; no model call): mise run eval-score --name <run>"
+run = ".venv/bin/python .mise/tasks/eval-score.py"
+depends = ["inst"]
+
+# AgentCore CLI project (agentcore/); every task deploys or builds ALL runtimes of the project
+[tasks.ac-gen]
+description = "🏗️ Generate agentcore/agentcore.json, agentcore/aws-targets.json (for ENV_NAME, default dev), and agentcore_app/<Runtime>/ from the config, uv.lock, and the package"
+run = ".venv/bin/python .mise/tasks/ac-gen.py"
+depends = ["inst"]
+
+[tasks.ac-check-wheels]
+description = "🏗️ Check every runtime's dependencies install as agentcore deploy installs them: wheels only, Linux aarch64 (dry run, no AWS call)"
+run = ".venv/bin/python .mise/tasks/ac-check-wheels.py"
+depends = ["ac-gen"]
+
+[tasks.ac-build]
+description = "🏗️ Build every runtime's CodeZip and synth the AgentCore stack of each target (no AWS calls)"
+run = "agentcore build"
+depends = ["ac-gen"]
+
+# Frontend
+#
+# The only thing that reads `data/site.toml` through the frontend's own loader,
+# so it is the only thing that catches a missing required key or an `icon` that
+# `lib/icons.ts` does not export. It also type-checks the TypeScript and
+# statically renders both routes.
+[tasks.build-web]
+description = "🏗️ Build the Next.js frontend (also the only check for site.toml keys and icon names)"
+run = "pnpm exec next build"
+
+# Every dev server is stamped with this env var so `mise run kill` can find
+# exactly our processes and nothing else. The name is generic on purpose; what
+# identifies a checkout is the *value*, which is this checkout's path.
+# kill-dev-servers.py reads the same name -- change it in both places or in
+# neither.
+[tasks.next-dev]
+description = "🌐 Start Next.js development server"
+env = { AGENT_APP_DEV_SERVER = "{{config_root}}" }
+# Pinned to 3000 on purpose: failing to start beats silently hopping to 3001.
+run = "next dev --port 3000"
+
+[tasks.dev]
+description = "🚀 Start the web development server (Next.js; the agent runs with ac-local-* tasks)"
+depends = ["kill"]
+env = { AGENT_APP_DEV_SERVER = "{{config_root}}" }
+run = "pnpm exec next dev --port 3000"
+
+[tasks.kill]
+description = "🛑 Kill this project's web development server"
+run = "uv run -- python kill-dev-servers.py"
+
+# Per-environment tasks (config, AgentCore deploy, CDK)
+[tasks.gen-env-tasks]
+description = "🧩 Regenerate every per-environment task (config-*, ac-*, cdk-*) and per-runtime task (ac-local-*, ac-dev-*) below from EnvNameEnum, StackCtxEnum, and the runtime registry (rewrites the <env-tasks> block)"
+run = ".venv/bin/python .mise/tasks/gen-env-tasks.py"
+depends = ["inst"]
+
+[tasks.gen-quick-links]
+description = "🔗 Regenerate QUICK_LINKS.md, the console of every AWS resource in every environment: stacks and config from config/, runtimes, their roles and logs looked up in AWS (read only) with each environment's profile"
+run = ".venv/bin/python .mise/tasks/gen-quick-links.py"
+depends = ["inst"]
+
+[tasks.print-cdk-stack-urls]
+description = "🔗 Print the CloudFormation console URL of every stack in every environment (no AWS call; a failing environment prints an error, the rest still print)"
+run = ".venv/bin/python .mise/tasks/print-cdk-stack-urls.py"
+depends = ["inst"]
+
+# <env-tasks>
+# Generated by `mise run gen-env-tasks`. Do not edit by hand.
+
+[tasks."config-deploy-dev"]
+description = "⚙️ Deploy the config of dev to SSM Parameter Store, if it changed (writes to AWS)"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> config-deploy-dev: Deploy the config of dev to SSM Parameter Store, if it changed (writes to AWS)'
+.venv/bin/python .mise/tasks/config-deploy.py
+"""
+
+[tasks."config-delete-dev"]
+description = "🗑️ Delete the config of dev from SSM Parameter Store (writes to AWS)"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> config-delete-dev: Delete the config of dev from SSM Parameter Store (writes to AWS)'
+.venv/bin/python .mise/tasks/confirm.py --action 'Delete the config parameter of dev?' --skip_var CONFIRM_YES --skip_var CONFIRMED_BY_CHAIN
+.venv/bin/python .mise/tasks/config-delete.py
+"""
+
+[tasks."ac-deploy-dev"]
+description = "🚀 Deploy every AgentCore runtime to the dev target: check that the agentcore-deps policy and the config exist, generate the project for dev, check the wheels, deploy (writes to AWS)"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> ac-deploy-dev: Deploy every AgentCore runtime to the dev target: check that the agentcore-deps policy and the config exist, generate the project for dev, check the wheels, deploy (writes to AWS)'
+echo '--- CloudFormation console ---'
+echo 'AgentCore stack: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=AgentCore-AgentAudit-dev&filteringStatus=active&viewNested=true'
+.venv/bin/python .mise/tasks/ac-check-deps.py
+.venv/bin/python .mise/tasks/ac-gen.py
+.venv/bin/python .mise/tasks/ac-check-wheels.py
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore deploy --target dev'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore deploy --target dev
+echo 'Commit agentcore/.cli/deployed-state.json if it changed: everyone who deploys shares it'
+"""
+
+[tasks."ac-down-dev"]
+description = "🔴 Destroy every AgentCore runtime of the dev target: deploy an empty project with --yes, then generate the real one again, even if the deploy fails (writes to AWS; keeps the agentcore-deps stack and the config)"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> ac-down-dev: Destroy every AgentCore runtime of the dev target: deploy an empty project with --yes, then generate the real one again, even if the deploy fails (writes to AWS; keeps the agentcore-deps stack and the config)'
+.venv/bin/python .mise/tasks/confirm.py --action 'Destroy every AgentCore runtime of dev?' --skip_var CONFIRM_YES --skip_var CONFIRMED_BY_CHAIN
+echo '--- CloudFormation console ---'
+echo 'AgentCore stack: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=AgentCore-AgentAudit-dev&filteringStatus=active&viewNested=true'
+.venv/bin/python .mise/tasks/ac-gen-teardown.py
+trap '.venv/bin/python .mise/tasks/ac-gen.py' EXIT
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore deploy --target dev --yes'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore deploy --target dev --yes
+echo 'Commit agentcore/.cli/deployed-state.json if it changed: everyone who deploys shares it'
+"""
+
+[tasks."ac-status-dev"]
+description = "🔎 Show the deployed AgentCore runtimes of the dev target (reads AWS)"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> ac-status-dev: Show the deployed AgentCore runtimes of the dev target (reads AWS)'
+echo '--- CloudFormation console ---'
+echo 'AgentCore stack: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=AgentCore-AgentAudit-dev&filteringStatus=active&viewNested=true'
+.venv/bin/python .mise/tasks/ac-gen.py
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore status --target dev'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore status --target dev
+"""
+
+[tasks."ac-invoke-dev-audit-mcp"]
+description = "🤖 Invoke the deployed AuditMcp of dev with its sample payload; SESSION_ID=<id> continues a session (calls AWS)"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> ac-invoke-dev-audit-mcp: Invoke the deployed AuditMcp of dev with its sample payload; SESSION_ID=<id> continues a session (calls AWS)'
+.venv/bin/python .mise/tasks/ac-gen.py
+PAYLOAD='{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "list_sessions", "arguments": {"limit": 3}}}'
+echo '--- Run command ---'
+echo "AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore invoke --target dev --runtime AuditMcp --mcp-method tools/call --mcp-name list_sessions --payload '$PAYLOAD' ${SESSION_ID:+--session-id $SESSION_ID}"
+AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore invoke --target dev --runtime AuditMcp --mcp-method tools/call --mcp-name list_sessions --payload "$PAYLOAD" ${SESSION_ID:+--session-id $SESSION_ID}
+"""
+
+[tasks."ac-invoke-dev-audit-agent"]
+description = "🤖 Invoke the deployed AuditAgent of dev with its sample payload; SESSION_ID=<id> continues a session (calls AWS)"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> ac-invoke-dev-audit-agent: Invoke the deployed AuditAgent of dev with its sample payload; SESSION_ID=<id> continues a session (calls AWS)'
+.venv/bin/python .mise/tasks/ac-gen.py
+PAYLOAD='{"prompt": "Audit session ses_e70a629f1a7e. Is anything in it a security risk?"}'
+echo '--- Run command ---'
+echo "AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore invoke --target dev --runtime AuditAgent --payload '$PAYLOAD' ${SESSION_ID:+--session-id $SESSION_ID}"
+AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore invoke --target dev --runtime AuditAgent --payload "$PAYLOAD" ${SESSION_ID:+--session-id $SESSION_ID}
+"""
+
+[tasks."ac-logs-dev-audit-mcp"]
+description = "📜 Show the recent logs of the deployed AuditMcp of dev; SINCE=2h looks further back (reads AWS)"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> ac-logs-dev-audit-mcp: Show the recent logs of the deployed AuditMcp of dev; SINCE=2h looks further back (reads AWS)'
+.venv/bin/python .mise/tasks/ac-gen.py
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore logs runtime --name AuditMcp --target dev --since ${SINCE:-30m}'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore logs runtime --name AuditMcp --target dev --since ${SINCE:-30m}
+"""
+
+[tasks."ac-logs-dev-audit-agent"]
+description = "📜 Show the recent logs of the deployed AuditAgent of dev; SINCE=2h looks further back (reads AWS)"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> ac-logs-dev-audit-agent: Show the recent logs of the deployed AuditAgent of dev; SINCE=2h looks further back (reads AWS)'
+.venv/bin/python .mise/tasks/ac-gen.py
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore logs runtime --name AuditAgent --target dev --since ${SINCE:-30m}'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_DEV}} agentcore logs runtime --name AuditAgent --target dev --since ${SINCE:-30m}
+"""
+
+[tasks."ac-chain-up-dev"]
+description = "🚀 Deploy everything AgentCore of dev: config-deploy-dev → cdk-up-dev-agentcore-deps-stack → ac-deploy-dev"
+run = [
+    "echo '=== ac-chain-up-dev: Deploy everything AgentCore of dev, in this order ==='",
+    "echo '  1. config-deploy-dev: Deploy the config of dev to SSM Parameter Store, if it changed (writes to AWS)'",
+    "echo '  2. cdk-up-dev-agentcore-deps-stack: Deploy stack agentcore-deps of dev (no approval prompt)'",
+    "echo '  3. ac-deploy-dev: Deploy every AgentCore runtime to the dev target: check that the agentcore-deps policy and the config exist, generate the project for dev, check the wheels, deploy (writes to AWS)'",
+    { task = "config-deploy-dev" },
+    { task = "cdk-up-dev-agentcore-deps-stack" },
+    { task = "ac-deploy-dev" },
+    "echo '=== ac-chain-up-dev: done ==='",
+]
+
+[tasks."ac-chain-down-dev"]
+description = "🔴 Destroy everything AgentCore of dev: ac-down-dev → cdk-down-dev-agentcore-deps-stack → config-delete-dev"
+env = { CONFIRMED_BY_CHAIN = "true" }
+run = [
+    "echo '=== ac-chain-down-dev: Destroy everything AgentCore of dev, in this order ==='",
+    "echo '  1. ac-down-dev: Destroy every AgentCore runtime of the dev target: deploy an empty project with --yes, then generate the real one again, even if the deploy fails (writes to AWS; keeps the agentcore-deps stack and the config)'",
+    "echo '  2. cdk-down-dev-agentcore-deps-stack: Destroy stack agentcore-deps of dev (force, no confirmation)'",
+    "echo '  3. config-delete-dev: Delete the config of dev from SSM Parameter Store (writes to AWS)'",
+    ".venv/bin/python .mise/tasks/confirm.py --action 'Destroy the AgentCore runtimes, the agentcore-deps stack, and the config of dev?' --skip_var CONFIRM_YES",
+    { task = "ac-down-dev" },
+    { task = "cdk-down-dev-agentcore-deps-stack" },
+    { task = "config-delete-dev" },
+    "echo '=== ac-chain-down-dev: done ==='",
+]
+
+[tasks."ac-test-dev"]
+description = "🧪 Test the deployed AgentCore runtimes of dev: ac-status-dev → ac-invoke-dev-audit-mcp → ac-invoke-dev-audit-agent"
+run = [
+    "echo '=== ac-test-dev: Test the deployed AgentCore runtimes of dev, in this order ==='",
+    "echo '  1. ac-status-dev: Show the deployed AgentCore runtimes of the dev target (reads AWS)'",
+    "echo '  2. ac-invoke-dev-audit-mcp: Invoke the deployed AuditMcp of dev with its sample payload; SESSION_ID=<id> continues a session (calls AWS)'",
+    "echo '  3. ac-invoke-dev-audit-agent: Invoke the deployed AuditAgent of dev with its sample payload; SESSION_ID=<id> continues a session (calls AWS)'",
+    { task = "ac-status-dev" },
+    { task = "ac-invoke-dev-audit-mcp" },
+    { task = "ac-invoke-dev-audit-agent" },
+    "echo '=== ac-test-dev: done ==='",
+]
+
+[tasks."cdk-synth-dev-all"]
+description = "⚪ Synthesize all stacks of dev to CloudFormation templates (no AWS call)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-synth-dev-all: Synthesize all stacks of dev to CloudFormation templates (no AWS call)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-agentcore-deps&filteringStatus=active&viewNested=true'
+echo 'agent-audit-dev-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk synth'
+cdk synth
+"""
+
+[tasks."cdk-plan-dev-all"]
+description = "🔵 Plan all stacks of dev: diff against what is deployed, through a CloudFormation change set (no deploy)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-plan-dev-all: Plan all stacks of dev: diff against what is deployed, through a CloudFormation change set (no deploy)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-agentcore-deps&filteringStatus=active&viewNested=true'
+echo 'agent-audit-dev-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk diff --all --method auto --profile {{env.AWS_PROFILE_FOR_DEV}}'
+cdk diff --all --method auto --profile {{env.AWS_PROFILE_FOR_DEV}}
+"""
+
+[tasks."cdk-up-dev-all"]
+description = "🟢 Deploy all stacks of dev (no approval prompt)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-up-dev-all: Deploy all stacks of dev (no approval prompt)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-agentcore-deps&filteringStatus=active&viewNested=true'
+echo 'agent-audit-dev-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk deploy --all --require-approval never --profile {{env.AWS_PROFILE_FOR_DEV}}'
+cdk deploy --all --require-approval never --profile {{env.AWS_PROFILE_FOR_DEV}}
+"""
+
+[tasks."cdk-down-dev-all"]
+description = "🔴 Destroy all stacks of dev (force, no confirmation)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-down-dev-all: Destroy all stacks of dev (force, no confirmation)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-agentcore-deps&filteringStatus=active&viewNested=true'
+echo 'agent-audit-dev-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk destroy --all --force --profile {{env.AWS_PROFILE_FOR_DEV}}'
+cdk destroy --all --force --profile {{env.AWS_PROFILE_FOR_DEV}}
+"""
+
+[tasks."cdk-synth-dev-agentcore-deps-stack"]
+description = "⚪ Synthesize stack agentcore-deps of dev to CloudFormation templates (no AWS call)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-synth-dev-agentcore-deps-stack: Synthesize stack agentcore-deps of dev to CloudFormation templates (no AWS call)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-agentcore-deps&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk synth agent-audit-dev-agentcore-deps --exclusively'
+cdk synth agent-audit-dev-agentcore-deps --exclusively
+"""
+
+[tasks."cdk-plan-dev-agentcore-deps-stack"]
+description = "🔵 Plan stack agentcore-deps of dev: diff against what is deployed, through a CloudFormation change set (no deploy)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-plan-dev-agentcore-deps-stack: Plan stack agentcore-deps of dev: diff against what is deployed, through a CloudFormation change set (no deploy)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-agentcore-deps&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk diff agent-audit-dev-agentcore-deps --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_DEV}}'
+cdk diff agent-audit-dev-agentcore-deps --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_DEV}}
+"""
+
+[tasks."cdk-up-dev-agentcore-deps-stack"]
+description = "🟢 Deploy stack agentcore-deps of dev (no approval prompt)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-up-dev-agentcore-deps-stack: Deploy stack agentcore-deps of dev (no approval prompt)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-agentcore-deps&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk deploy agent-audit-dev-agentcore-deps --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_DEV}}'
+cdk deploy agent-audit-dev-agentcore-deps --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_DEV}}
+"""
+
+[tasks."cdk-down-dev-agentcore-deps-stack"]
+description = "🔴 Destroy stack agentcore-deps of dev (force, no confirmation)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-down-dev-agentcore-deps-stack: Destroy stack agentcore-deps of dev (force, no confirmation)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-agentcore-deps&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk destroy agent-audit-dev-agentcore-deps --exclusively --force --profile {{env.AWS_PROFILE_FOR_DEV}}'
+cdk destroy agent-audit-dev-agentcore-deps --exclusively --force --profile {{env.AWS_PROFILE_FOR_DEV}}
+"""
+
+[tasks."cdk-synth-dev-web-invoker-stack"]
+description = "⚪ Synthesize stack web-invoker of dev to CloudFormation templates (no AWS call)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-synth-dev-web-invoker-stack: Synthesize stack web-invoker of dev to CloudFormation templates (no AWS call)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk synth agent-audit-dev-web-invoker --exclusively'
+cdk synth agent-audit-dev-web-invoker --exclusively
+"""
+
+[tasks."cdk-plan-dev-web-invoker-stack"]
+description = "🔵 Plan stack web-invoker of dev: diff against what is deployed, through a CloudFormation change set (no deploy)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-plan-dev-web-invoker-stack: Plan stack web-invoker of dev: diff against what is deployed, through a CloudFormation change set (no deploy)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk diff agent-audit-dev-web-invoker --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_DEV}}'
+cdk diff agent-audit-dev-web-invoker --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_DEV}}
+"""
+
+[tasks."cdk-up-dev-web-invoker-stack"]
+description = "🟢 Deploy stack web-invoker of dev (no approval prompt)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-up-dev-web-invoker-stack: Deploy stack web-invoker of dev (no approval prompt)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk deploy agent-audit-dev-web-invoker --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_DEV}}'
+cdk deploy agent-audit-dev-web-invoker --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_DEV}}
+"""
+
+[tasks."cdk-down-dev-web-invoker-stack"]
+description = "🔴 Destroy stack web-invoker of dev (force, no confirmation)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-down-dev-web-invoker-stack: Destroy stack web-invoker of dev (force, no confirmation)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk destroy agent-audit-dev-web-invoker --exclusively --force --profile {{env.AWS_PROFILE_FOR_DEV}}'
+cdk destroy agent-audit-dev-web-invoker --exclusively --force --profile {{env.AWS_PROFILE_FOR_DEV}}
+"""
+
+[tasks."config-deploy-tst"]
+description = "⚙️ Deploy the config of tst to SSM Parameter Store, if it changed (writes to AWS)"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> config-deploy-tst: Deploy the config of tst to SSM Parameter Store, if it changed (writes to AWS)'
+.venv/bin/python .mise/tasks/config-deploy.py
+"""
+
+[tasks."config-delete-tst"]
+description = "🗑️ Delete the config of tst from SSM Parameter Store (writes to AWS)"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> config-delete-tst: Delete the config of tst from SSM Parameter Store (writes to AWS)'
+.venv/bin/python .mise/tasks/confirm.py --action 'Delete the config parameter of tst?' --skip_var CONFIRM_YES --skip_var CONFIRMED_BY_CHAIN
+.venv/bin/python .mise/tasks/config-delete.py
+"""
+
+[tasks."ac-deploy-tst"]
+description = "🚀 Deploy every AgentCore runtime to the tst target: check that the agentcore-deps policy and the config exist, generate the project for tst, check the wheels, deploy (writes to AWS)"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> ac-deploy-tst: Deploy every AgentCore runtime to the tst target: check that the agentcore-deps policy and the config exist, generate the project for tst, check the wheels, deploy (writes to AWS)'
+echo '--- CloudFormation console ---'
+echo 'AgentCore stack: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=AgentCore-AgentAudit-tst&filteringStatus=active&viewNested=true'
+.venv/bin/python .mise/tasks/ac-check-deps.py
+.venv/bin/python .mise/tasks/ac-gen.py
+.venv/bin/python .mise/tasks/ac-check-wheels.py
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore deploy --target tst'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore deploy --target tst
+echo 'Commit agentcore/.cli/deployed-state.json if it changed: everyone who deploys shares it'
+"""
+
+[tasks."ac-down-tst"]
+description = "🔴 Destroy every AgentCore runtime of the tst target: deploy an empty project with --yes, then generate the real one again, even if the deploy fails (writes to AWS; keeps the agentcore-deps stack and the config)"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> ac-down-tst: Destroy every AgentCore runtime of the tst target: deploy an empty project with --yes, then generate the real one again, even if the deploy fails (writes to AWS; keeps the agentcore-deps stack and the config)'
+.venv/bin/python .mise/tasks/confirm.py --action 'Destroy every AgentCore runtime of tst?' --skip_var CONFIRM_YES --skip_var CONFIRMED_BY_CHAIN
+echo '--- CloudFormation console ---'
+echo 'AgentCore stack: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=AgentCore-AgentAudit-tst&filteringStatus=active&viewNested=true'
+.venv/bin/python .mise/tasks/ac-gen-teardown.py
+trap '.venv/bin/python .mise/tasks/ac-gen.py' EXIT
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore deploy --target tst --yes'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore deploy --target tst --yes
+echo 'Commit agentcore/.cli/deployed-state.json if it changed: everyone who deploys shares it'
+"""
+
+[tasks."ac-status-tst"]
+description = "🔎 Show the deployed AgentCore runtimes of the tst target (reads AWS)"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> ac-status-tst: Show the deployed AgentCore runtimes of the tst target (reads AWS)'
+echo '--- CloudFormation console ---'
+echo 'AgentCore stack: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=AgentCore-AgentAudit-tst&filteringStatus=active&viewNested=true'
+.venv/bin/python .mise/tasks/ac-gen.py
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore status --target tst'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore status --target tst
+"""
+
+[tasks."ac-invoke-tst-audit-mcp"]
+description = "🤖 Invoke the deployed AuditMcp of tst with its sample payload; SESSION_ID=<id> continues a session (calls AWS)"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> ac-invoke-tst-audit-mcp: Invoke the deployed AuditMcp of tst with its sample payload; SESSION_ID=<id> continues a session (calls AWS)'
+.venv/bin/python .mise/tasks/ac-gen.py
+PAYLOAD='{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "list_sessions", "arguments": {"limit": 3}}}'
+echo '--- Run command ---'
+echo "AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore invoke --target tst --runtime AuditMcp --mcp-method tools/call --mcp-name list_sessions --payload '$PAYLOAD' ${SESSION_ID:+--session-id $SESSION_ID}"
+AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore invoke --target tst --runtime AuditMcp --mcp-method tools/call --mcp-name list_sessions --payload "$PAYLOAD" ${SESSION_ID:+--session-id $SESSION_ID}
+"""
+
+[tasks."ac-invoke-tst-audit-agent"]
+description = "🤖 Invoke the deployed AuditAgent of tst with its sample payload; SESSION_ID=<id> continues a session (calls AWS)"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> ac-invoke-tst-audit-agent: Invoke the deployed AuditAgent of tst with its sample payload; SESSION_ID=<id> continues a session (calls AWS)'
+.venv/bin/python .mise/tasks/ac-gen.py
+PAYLOAD='{"prompt": "Audit session ses_e70a629f1a7e. Is anything in it a security risk?"}'
+echo '--- Run command ---'
+echo "AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore invoke --target tst --runtime AuditAgent --payload '$PAYLOAD' ${SESSION_ID:+--session-id $SESSION_ID}"
+AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore invoke --target tst --runtime AuditAgent --payload "$PAYLOAD" ${SESSION_ID:+--session-id $SESSION_ID}
+"""
+
+[tasks."ac-logs-tst-audit-mcp"]
+description = "📜 Show the recent logs of the deployed AuditMcp of tst; SINCE=2h looks further back (reads AWS)"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> ac-logs-tst-audit-mcp: Show the recent logs of the deployed AuditMcp of tst; SINCE=2h looks further back (reads AWS)'
+.venv/bin/python .mise/tasks/ac-gen.py
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore logs runtime --name AuditMcp --target tst --since ${SINCE:-30m}'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore logs runtime --name AuditMcp --target tst --since ${SINCE:-30m}
+"""
+
+[tasks."ac-logs-tst-audit-agent"]
+description = "📜 Show the recent logs of the deployed AuditAgent of tst; SINCE=2h looks further back (reads AWS)"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> ac-logs-tst-audit-agent: Show the recent logs of the deployed AuditAgent of tst; SINCE=2h looks further back (reads AWS)'
+.venv/bin/python .mise/tasks/ac-gen.py
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore logs runtime --name AuditAgent --target tst --since ${SINCE:-30m}'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_TST}} agentcore logs runtime --name AuditAgent --target tst --since ${SINCE:-30m}
+"""
+
+[tasks."ac-chain-up-tst"]
+description = "🚀 Deploy everything AgentCore of tst: config-deploy-tst → cdk-up-tst-agentcore-deps-stack → ac-deploy-tst"
+run = [
+    "echo '=== ac-chain-up-tst: Deploy everything AgentCore of tst, in this order ==='",
+    "echo '  1. config-deploy-tst: Deploy the config of tst to SSM Parameter Store, if it changed (writes to AWS)'",
+    "echo '  2. cdk-up-tst-agentcore-deps-stack: Deploy stack agentcore-deps of tst (no approval prompt)'",
+    "echo '  3. ac-deploy-tst: Deploy every AgentCore runtime to the tst target: check that the agentcore-deps policy and the config exist, generate the project for tst, check the wheels, deploy (writes to AWS)'",
+    { task = "config-deploy-tst" },
+    { task = "cdk-up-tst-agentcore-deps-stack" },
+    { task = "ac-deploy-tst" },
+    "echo '=== ac-chain-up-tst: done ==='",
+]
+
+[tasks."ac-chain-down-tst"]
+description = "🔴 Destroy everything AgentCore of tst: ac-down-tst → cdk-down-tst-agentcore-deps-stack → config-delete-tst"
+env = { CONFIRMED_BY_CHAIN = "true" }
+run = [
+    "echo '=== ac-chain-down-tst: Destroy everything AgentCore of tst, in this order ==='",
+    "echo '  1. ac-down-tst: Destroy every AgentCore runtime of the tst target: deploy an empty project with --yes, then generate the real one again, even if the deploy fails (writes to AWS; keeps the agentcore-deps stack and the config)'",
+    "echo '  2. cdk-down-tst-agentcore-deps-stack: Destroy stack agentcore-deps of tst (force, no confirmation)'",
+    "echo '  3. config-delete-tst: Delete the config of tst from SSM Parameter Store (writes to AWS)'",
+    ".venv/bin/python .mise/tasks/confirm.py --action 'Destroy the AgentCore runtimes, the agentcore-deps stack, and the config of tst?' --skip_var CONFIRM_YES",
+    { task = "ac-down-tst" },
+    { task = "cdk-down-tst-agentcore-deps-stack" },
+    { task = "config-delete-tst" },
+    "echo '=== ac-chain-down-tst: done ==='",
+]
+
+[tasks."ac-test-tst"]
+description = "🧪 Test the deployed AgentCore runtimes of tst: ac-status-tst → ac-invoke-tst-audit-mcp → ac-invoke-tst-audit-agent"
+run = [
+    "echo '=== ac-test-tst: Test the deployed AgentCore runtimes of tst, in this order ==='",
+    "echo '  1. ac-status-tst: Show the deployed AgentCore runtimes of the tst target (reads AWS)'",
+    "echo '  2. ac-invoke-tst-audit-mcp: Invoke the deployed AuditMcp of tst with its sample payload; SESSION_ID=<id> continues a session (calls AWS)'",
+    "echo '  3. ac-invoke-tst-audit-agent: Invoke the deployed AuditAgent of tst with its sample payload; SESSION_ID=<id> continues a session (calls AWS)'",
+    { task = "ac-status-tst" },
+    { task = "ac-invoke-tst-audit-mcp" },
+    { task = "ac-invoke-tst-audit-agent" },
+    "echo '=== ac-test-tst: done ==='",
+]
+
+[tasks."cdk-synth-tst-all"]
+description = "⚪ Synthesize all stacks of tst to CloudFormation templates (no AWS call)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-synth-tst-all: Synthesize all stacks of tst to CloudFormation templates (no AWS call)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-agentcore-deps&filteringStatus=active&viewNested=true'
+echo 'agent-audit-tst-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk synth'
+cdk synth
+"""
+
+[tasks."cdk-plan-tst-all"]
+description = "🔵 Plan all stacks of tst: diff against what is deployed, through a CloudFormation change set (no deploy)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-plan-tst-all: Plan all stacks of tst: diff against what is deployed, through a CloudFormation change set (no deploy)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-agentcore-deps&filteringStatus=active&viewNested=true'
+echo 'agent-audit-tst-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk diff --all --method auto --profile {{env.AWS_PROFILE_FOR_TST}}'
+cdk diff --all --method auto --profile {{env.AWS_PROFILE_FOR_TST}}
+"""
+
+[tasks."cdk-up-tst-all"]
+description = "🟢 Deploy all stacks of tst (no approval prompt)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-up-tst-all: Deploy all stacks of tst (no approval prompt)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-agentcore-deps&filteringStatus=active&viewNested=true'
+echo 'agent-audit-tst-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk deploy --all --require-approval never --profile {{env.AWS_PROFILE_FOR_TST}}'
+cdk deploy --all --require-approval never --profile {{env.AWS_PROFILE_FOR_TST}}
+"""
+
+[tasks."cdk-down-tst-all"]
+description = "🔴 Destroy all stacks of tst (force, no confirmation)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-down-tst-all: Destroy all stacks of tst (force, no confirmation)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-agentcore-deps&filteringStatus=active&viewNested=true'
+echo 'agent-audit-tst-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk destroy --all --force --profile {{env.AWS_PROFILE_FOR_TST}}'
+cdk destroy --all --force --profile {{env.AWS_PROFILE_FOR_TST}}
+"""
+
+[tasks."cdk-synth-tst-agentcore-deps-stack"]
+description = "⚪ Synthesize stack agentcore-deps of tst to CloudFormation templates (no AWS call)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-synth-tst-agentcore-deps-stack: Synthesize stack agentcore-deps of tst to CloudFormation templates (no AWS call)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-agentcore-deps&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk synth agent-audit-tst-agentcore-deps --exclusively'
+cdk synth agent-audit-tst-agentcore-deps --exclusively
+"""
+
+[tasks."cdk-plan-tst-agentcore-deps-stack"]
+description = "🔵 Plan stack agentcore-deps of tst: diff against what is deployed, through a CloudFormation change set (no deploy)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-plan-tst-agentcore-deps-stack: Plan stack agentcore-deps of tst: diff against what is deployed, through a CloudFormation change set (no deploy)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-agentcore-deps&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk diff agent-audit-tst-agentcore-deps --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_TST}}'
+cdk diff agent-audit-tst-agentcore-deps --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_TST}}
+"""
+
+[tasks."cdk-up-tst-agentcore-deps-stack"]
+description = "🟢 Deploy stack agentcore-deps of tst (no approval prompt)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-up-tst-agentcore-deps-stack: Deploy stack agentcore-deps of tst (no approval prompt)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-agentcore-deps&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk deploy agent-audit-tst-agentcore-deps --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_TST}}'
+cdk deploy agent-audit-tst-agentcore-deps --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_TST}}
+"""
+
+[tasks."cdk-down-tst-agentcore-deps-stack"]
+description = "🔴 Destroy stack agentcore-deps of tst (force, no confirmation)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-down-tst-agentcore-deps-stack: Destroy stack agentcore-deps of tst (force, no confirmation)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-agentcore-deps&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk destroy agent-audit-tst-agentcore-deps --exclusively --force --profile {{env.AWS_PROFILE_FOR_TST}}'
+cdk destroy agent-audit-tst-agentcore-deps --exclusively --force --profile {{env.AWS_PROFILE_FOR_TST}}
+"""
+
+[tasks."cdk-synth-tst-web-invoker-stack"]
+description = "⚪ Synthesize stack web-invoker of tst to CloudFormation templates (no AWS call)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-synth-tst-web-invoker-stack: Synthesize stack web-invoker of tst to CloudFormation templates (no AWS call)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk synth agent-audit-tst-web-invoker --exclusively'
+cdk synth agent-audit-tst-web-invoker --exclusively
+"""
+
+[tasks."cdk-plan-tst-web-invoker-stack"]
+description = "🔵 Plan stack web-invoker of tst: diff against what is deployed, through a CloudFormation change set (no deploy)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-plan-tst-web-invoker-stack: Plan stack web-invoker of tst: diff against what is deployed, through a CloudFormation change set (no deploy)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk diff agent-audit-tst-web-invoker --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_TST}}'
+cdk diff agent-audit-tst-web-invoker --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_TST}}
+"""
+
+[tasks."cdk-up-tst-web-invoker-stack"]
+description = "🟢 Deploy stack web-invoker of tst (no approval prompt)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-up-tst-web-invoker-stack: Deploy stack web-invoker of tst (no approval prompt)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk deploy agent-audit-tst-web-invoker --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_TST}}'
+cdk deploy agent-audit-tst-web-invoker --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_TST}}
+"""
+
+[tasks."cdk-down-tst-web-invoker-stack"]
+description = "🔴 Destroy stack web-invoker of tst (force, no confirmation)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-down-tst-web-invoker-stack: Destroy stack web-invoker of tst (force, no confirmation)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk destroy agent-audit-tst-web-invoker --exclusively --force --profile {{env.AWS_PROFILE_FOR_TST}}'
+cdk destroy agent-audit-tst-web-invoker --exclusively --force --profile {{env.AWS_PROFILE_FOR_TST}}
+"""
+
+[tasks."config-deploy-prd"]
+description = "⚙️ Deploy the config of prd to SSM Parameter Store, if it changed (writes to AWS)"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> config-deploy-prd: Deploy the config of prd to SSM Parameter Store, if it changed (writes to AWS)'
+.venv/bin/python .mise/tasks/config-deploy.py
+"""
+
+[tasks."config-delete-prd"]
+description = "🗑️ Delete the config of prd from SSM Parameter Store (writes to AWS)"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> config-delete-prd: Delete the config of prd from SSM Parameter Store (writes to AWS)'
+.venv/bin/python .mise/tasks/confirm.py --action 'Delete the config parameter of prd?' --skip_var CONFIRM_YES --skip_var CONFIRMED_BY_CHAIN
+.venv/bin/python .mise/tasks/config-delete.py
+"""
+
+[tasks."ac-deploy-prd"]
+description = "🚀 Deploy every AgentCore runtime to the prd target: check that the agentcore-deps policy and the config exist, generate the project for prd, check the wheels, deploy (writes to AWS)"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> ac-deploy-prd: Deploy every AgentCore runtime to the prd target: check that the agentcore-deps policy and the config exist, generate the project for prd, check the wheels, deploy (writes to AWS)'
+echo '--- CloudFormation console ---'
+echo 'AgentCore stack: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=AgentCore-AgentAudit-prd&filteringStatus=active&viewNested=true'
+.venv/bin/python .mise/tasks/ac-check-deps.py
+.venv/bin/python .mise/tasks/ac-gen.py
+.venv/bin/python .mise/tasks/ac-check-wheels.py
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore deploy --target prd'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore deploy --target prd
+echo 'Commit agentcore/.cli/deployed-state.json if it changed: everyone who deploys shares it'
+"""
+
+[tasks."ac-down-prd"]
+description = "🔴 Destroy every AgentCore runtime of the prd target: deploy an empty project with --yes, then generate the real one again, even if the deploy fails (writes to AWS; keeps the agentcore-deps stack and the config)"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> ac-down-prd: Destroy every AgentCore runtime of the prd target: deploy an empty project with --yes, then generate the real one again, even if the deploy fails (writes to AWS; keeps the agentcore-deps stack and the config)'
+.venv/bin/python .mise/tasks/confirm.py --action 'Destroy every AgentCore runtime of prd?' --skip_var CONFIRM_YES --skip_var CONFIRMED_BY_CHAIN
+echo '--- CloudFormation console ---'
+echo 'AgentCore stack: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=AgentCore-AgentAudit-prd&filteringStatus=active&viewNested=true'
+.venv/bin/python .mise/tasks/ac-gen-teardown.py
+trap '.venv/bin/python .mise/tasks/ac-gen.py' EXIT
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore deploy --target prd --yes'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore deploy --target prd --yes
+echo 'Commit agentcore/.cli/deployed-state.json if it changed: everyone who deploys shares it'
+"""
+
+[tasks."ac-status-prd"]
+description = "🔎 Show the deployed AgentCore runtimes of the prd target (reads AWS)"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> ac-status-prd: Show the deployed AgentCore runtimes of the prd target (reads AWS)'
+echo '--- CloudFormation console ---'
+echo 'AgentCore stack: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=AgentCore-AgentAudit-prd&filteringStatus=active&viewNested=true'
+.venv/bin/python .mise/tasks/ac-gen.py
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore status --target prd'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore status --target prd
+"""
+
+[tasks."ac-invoke-prd-audit-mcp"]
+description = "🤖 Invoke the deployed AuditMcp of prd with its sample payload; SESSION_ID=<id> continues a session (calls AWS)"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> ac-invoke-prd-audit-mcp: Invoke the deployed AuditMcp of prd with its sample payload; SESSION_ID=<id> continues a session (calls AWS)'
+.venv/bin/python .mise/tasks/ac-gen.py
+PAYLOAD='{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "list_sessions", "arguments": {"limit": 3}}}'
+echo '--- Run command ---'
+echo "AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore invoke --target prd --runtime AuditMcp --mcp-method tools/call --mcp-name list_sessions --payload '$PAYLOAD' ${SESSION_ID:+--session-id $SESSION_ID}"
+AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore invoke --target prd --runtime AuditMcp --mcp-method tools/call --mcp-name list_sessions --payload "$PAYLOAD" ${SESSION_ID:+--session-id $SESSION_ID}
+"""
+
+[tasks."ac-invoke-prd-audit-agent"]
+description = "🤖 Invoke the deployed AuditAgent of prd with its sample payload; SESSION_ID=<id> continues a session (calls AWS)"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> ac-invoke-prd-audit-agent: Invoke the deployed AuditAgent of prd with its sample payload; SESSION_ID=<id> continues a session (calls AWS)'
+.venv/bin/python .mise/tasks/ac-gen.py
+PAYLOAD='{"prompt": "Audit session ses_e70a629f1a7e. Is anything in it a security risk?"}'
+echo '--- Run command ---'
+echo "AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore invoke --target prd --runtime AuditAgent --payload '$PAYLOAD' ${SESSION_ID:+--session-id $SESSION_ID}"
+AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore invoke --target prd --runtime AuditAgent --payload "$PAYLOAD" ${SESSION_ID:+--session-id $SESSION_ID}
+"""
+
+[tasks."ac-logs-prd-audit-mcp"]
+description = "📜 Show the recent logs of the deployed AuditMcp of prd; SINCE=2h looks further back (reads AWS)"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> ac-logs-prd-audit-mcp: Show the recent logs of the deployed AuditMcp of prd; SINCE=2h looks further back (reads AWS)'
+.venv/bin/python .mise/tasks/ac-gen.py
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore logs runtime --name AuditMcp --target prd --since ${SINCE:-30m}'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore logs runtime --name AuditMcp --target prd --since ${SINCE:-30m}
+"""
+
+[tasks."ac-logs-prd-audit-agent"]
+description = "📜 Show the recent logs of the deployed AuditAgent of prd; SINCE=2h looks further back (reads AWS)"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> ac-logs-prd-audit-agent: Show the recent logs of the deployed AuditAgent of prd; SINCE=2h looks further back (reads AWS)'
+.venv/bin/python .mise/tasks/ac-gen.py
+echo '--- Run command ---'
+echo 'AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore logs runtime --name AuditAgent --target prd --since ${SINCE:-30m}'
+AWS_PROFILE={{env.AWS_PROFILE_FOR_PRD}} agentcore logs runtime --name AuditAgent --target prd --since ${SINCE:-30m}
+"""
+
+[tasks."ac-chain-up-prd"]
+description = "🚀 Deploy everything AgentCore of prd: config-deploy-prd → cdk-up-prd-agentcore-deps-stack → ac-deploy-prd"
+run = [
+    "echo '=== ac-chain-up-prd: Deploy everything AgentCore of prd, in this order ==='",
+    "echo '  1. config-deploy-prd: Deploy the config of prd to SSM Parameter Store, if it changed (writes to AWS)'",
+    "echo '  2. cdk-up-prd-agentcore-deps-stack: Deploy stack agentcore-deps of prd (no approval prompt)'",
+    "echo '  3. ac-deploy-prd: Deploy every AgentCore runtime to the prd target: check that the agentcore-deps policy and the config exist, generate the project for prd, check the wheels, deploy (writes to AWS)'",
+    { task = "config-deploy-prd" },
+    { task = "cdk-up-prd-agentcore-deps-stack" },
+    { task = "ac-deploy-prd" },
+    "echo '=== ac-chain-up-prd: done ==='",
+]
+
+[tasks."ac-chain-down-prd"]
+description = "🔴 Destroy everything AgentCore of prd: ac-down-prd → cdk-down-prd-agentcore-deps-stack → config-delete-prd"
+env = { CONFIRMED_BY_CHAIN = "true" }
+run = [
+    "echo '=== ac-chain-down-prd: Destroy everything AgentCore of prd, in this order ==='",
+    "echo '  1. ac-down-prd: Destroy every AgentCore runtime of the prd target: deploy an empty project with --yes, then generate the real one again, even if the deploy fails (writes to AWS; keeps the agentcore-deps stack and the config)'",
+    "echo '  2. cdk-down-prd-agentcore-deps-stack: Destroy stack agentcore-deps of prd (force, no confirmation)'",
+    "echo '  3. config-delete-prd: Delete the config of prd from SSM Parameter Store (writes to AWS)'",
+    ".venv/bin/python .mise/tasks/confirm.py --action 'Destroy the AgentCore runtimes, the agentcore-deps stack, and the config of prd?' --skip_var CONFIRM_YES",
+    { task = "ac-down-prd" },
+    { task = "cdk-down-prd-agentcore-deps-stack" },
+    { task = "config-delete-prd" },
+    "echo '=== ac-chain-down-prd: done ==='",
+]
+
+[tasks."ac-test-prd"]
+description = "🧪 Test the deployed AgentCore runtimes of prd: ac-status-prd → ac-invoke-prd-audit-mcp → ac-invoke-prd-audit-agent"
+run = [
+    "echo '=== ac-test-prd: Test the deployed AgentCore runtimes of prd, in this order ==='",
+    "echo '  1. ac-status-prd: Show the deployed AgentCore runtimes of the prd target (reads AWS)'",
+    "echo '  2. ac-invoke-prd-audit-mcp: Invoke the deployed AuditMcp of prd with its sample payload; SESSION_ID=<id> continues a session (calls AWS)'",
+    "echo '  3. ac-invoke-prd-audit-agent: Invoke the deployed AuditAgent of prd with its sample payload; SESSION_ID=<id> continues a session (calls AWS)'",
+    { task = "ac-status-prd" },
+    { task = "ac-invoke-prd-audit-mcp" },
+    { task = "ac-invoke-prd-audit-agent" },
+    "echo '=== ac-test-prd: done ==='",
+]
+
+[tasks."cdk-synth-prd-all"]
+description = "⚪ Synthesize all stacks of prd to CloudFormation templates (no AWS call)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-synth-prd-all: Synthesize all stacks of prd to CloudFormation templates (no AWS call)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-agentcore-deps&filteringStatus=active&viewNested=true'
+echo 'agent-audit-prd-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk synth'
+cdk synth
+"""
+
+[tasks."cdk-plan-prd-all"]
+description = "🔵 Plan all stacks of prd: diff against what is deployed, through a CloudFormation change set (no deploy)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-plan-prd-all: Plan all stacks of prd: diff against what is deployed, through a CloudFormation change set (no deploy)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-agentcore-deps&filteringStatus=active&viewNested=true'
+echo 'agent-audit-prd-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk diff --all --method auto --profile {{env.AWS_PROFILE_FOR_PRD}}'
+cdk diff --all --method auto --profile {{env.AWS_PROFILE_FOR_PRD}}
+"""
+
+[tasks."cdk-up-prd-all"]
+description = "🟢 Deploy all stacks of prd (no approval prompt)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-up-prd-all: Deploy all stacks of prd (no approval prompt)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-agentcore-deps&filteringStatus=active&viewNested=true'
+echo 'agent-audit-prd-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk deploy --all --require-approval never --profile {{env.AWS_PROFILE_FOR_PRD}}'
+cdk deploy --all --require-approval never --profile {{env.AWS_PROFILE_FOR_PRD}}
+"""
+
+[tasks."cdk-down-prd-all"]
+description = "🔴 Destroy all stacks of prd (force, no confirmation)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-down-prd-all: Destroy all stacks of prd (force, no confirmation)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-agentcore-deps&filteringStatus=active&viewNested=true'
+echo 'agent-audit-prd-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk destroy --all --force --profile {{env.AWS_PROFILE_FOR_PRD}}'
+cdk destroy --all --force --profile {{env.AWS_PROFILE_FOR_PRD}}
+"""
+
+[tasks."cdk-synth-prd-agentcore-deps-stack"]
+description = "⚪ Synthesize stack agentcore-deps of prd to CloudFormation templates (no AWS call)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-synth-prd-agentcore-deps-stack: Synthesize stack agentcore-deps of prd to CloudFormation templates (no AWS call)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-agentcore-deps&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk synth agent-audit-prd-agentcore-deps --exclusively'
+cdk synth agent-audit-prd-agentcore-deps --exclusively
+"""
+
+[tasks."cdk-plan-prd-agentcore-deps-stack"]
+description = "🔵 Plan stack agentcore-deps of prd: diff against what is deployed, through a CloudFormation change set (no deploy)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-plan-prd-agentcore-deps-stack: Plan stack agentcore-deps of prd: diff against what is deployed, through a CloudFormation change set (no deploy)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-agentcore-deps&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk diff agent-audit-prd-agentcore-deps --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_PRD}}'
+cdk diff agent-audit-prd-agentcore-deps --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_PRD}}
+"""
+
+[tasks."cdk-up-prd-agentcore-deps-stack"]
+description = "🟢 Deploy stack agentcore-deps of prd (no approval prompt)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-up-prd-agentcore-deps-stack: Deploy stack agentcore-deps of prd (no approval prompt)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-agentcore-deps&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk deploy agent-audit-prd-agentcore-deps --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_PRD}}'
+cdk deploy agent-audit-prd-agentcore-deps --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_PRD}}
+"""
+
+[tasks."cdk-down-prd-agentcore-deps-stack"]
+description = "🔴 Destroy stack agentcore-deps of prd (force, no confirmation)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-down-prd-agentcore-deps-stack: Destroy stack agentcore-deps of prd (force, no confirmation)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-agentcore-deps&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk destroy agent-audit-prd-agentcore-deps --exclusively --force --profile {{env.AWS_PROFILE_FOR_PRD}}'
+cdk destroy agent-audit-prd-agentcore-deps --exclusively --force --profile {{env.AWS_PROFILE_FOR_PRD}}
+"""
+
+[tasks."cdk-synth-prd-web-invoker-stack"]
+description = "⚪ Synthesize stack web-invoker of prd to CloudFormation templates (no AWS call)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-synth-prd-web-invoker-stack: Synthesize stack web-invoker of prd to CloudFormation templates (no AWS call)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk synth agent-audit-prd-web-invoker --exclusively'
+cdk synth agent-audit-prd-web-invoker --exclusively
+"""
+
+[tasks."cdk-plan-prd-web-invoker-stack"]
+description = "🔵 Plan stack web-invoker of prd: diff against what is deployed, through a CloudFormation change set (no deploy)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-plan-prd-web-invoker-stack: Plan stack web-invoker of prd: diff against what is deployed, through a CloudFormation change set (no deploy)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk diff agent-audit-prd-web-invoker --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_PRD}}'
+cdk diff agent-audit-prd-web-invoker --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_PRD}}
+"""
+
+[tasks."cdk-up-prd-web-invoker-stack"]
+description = "🟢 Deploy stack web-invoker of prd (no approval prompt)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-up-prd-web-invoker-stack: Deploy stack web-invoker of prd (no approval prompt)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk deploy agent-audit-prd-web-invoker --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_PRD}}'
+cdk deploy agent-audit-prd-web-invoker --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_PRD}}
+"""
+
+[tasks."cdk-down-prd-web-invoker-stack"]
+description = "🔴 Destroy stack web-invoker of prd (force, no confirmation)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-down-prd-web-invoker-stack: Destroy stack web-invoker of prd (force, no confirmation)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-web-invoker&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk destroy agent-audit-prd-web-invoker --exclusively --force --profile {{env.AWS_PROFILE_FOR_PRD}}'
+cdk destroy agent-audit-prd-web-invoker --exclusively --force --profile {{env.AWS_PROFILE_FOR_PRD}}
+"""
+
+[tasks."config-deploy-all"]
+description = "⚙️ Run config-deploy-<env> for every environment (writes to AWS)"
+depends = ["config-deploy-dev", "config-deploy-tst", "config-deploy-prd"]
+
+[tasks."config-delete-all"]
+description = "⚙️ Run config-delete-<env> for every environment (writes to AWS)"
+depends = ["config-delete-dev", "config-delete-tst", "config-delete-prd"]
+
+[tasks."ac-local-audit-mcp"]
+description = "🔌 Run the AuditMcp MCP server from the repo on port 18733 (Ctrl+C to stop)"
+run = ".venv/bin/python .mise/tasks/ac-run.py --runtime AuditMcp --mode local"
+depends = ["inst"]
+
+[tasks."ac-dev-audit-mcp"]
+description = "🏗️ Run the packaged AuditMcp with agentcore dev on port 18733, config from SSM of ENV_NAME (run config-deploy-<env> first)"
+run = ".venv/bin/python .mise/tasks/ac-run.py --runtime AuditMcp --mode dev"
+depends = ["ac-gen"]
+
+[tasks."ac-local-audit-mcp-call"]
+description = "📞 Call the local AuditMcp on port 18733 with its sample payload (start it with ac-local-audit-mcp or ac-dev-audit-mcp)"
+run = ".venv/bin/python .mise/tasks/ac-run.py --runtime AuditMcp --mode call"
+depends = ["inst"]
+
+[tasks."ac-local-audit-agent"]
+description = "🔌 Run the AuditAgent agent from the repo on port 18734 (Ctrl+C to stop); start its MCP runtimes first: AuditMcp"
+run = ".venv/bin/python .mise/tasks/ac-run.py --runtime AuditAgent --mode local"
+depends = ["inst"]
+
+[tasks."ac-dev-audit-agent"]
+description = "🏗️ Run the packaged AuditAgent with agentcore dev on port 18734, config from SSM of ENV_NAME (run config-deploy-<env> first); start its MCP runtimes first: AuditMcp"
+run = ".venv/bin/python .mise/tasks/ac-run.py --runtime AuditAgent --mode dev"
+depends = ["ac-gen"]
+
+[tasks."ac-local-audit-agent-call"]
+description = "📞 Call the local AuditAgent on port 18734 with its sample payload (start it with ac-local-audit-agent or ac-dev-audit-agent)"
+run = ".venv/bin/python .mise/tasks/ac-run.py --runtime AuditAgent --mode call"
+depends = ["inst"]
+
+# </env-tasks>

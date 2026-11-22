@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* This app is light-only. There is no theme toggle and no `dark` class: the
+ * dark palette that used to live here, plus 121 `dark:` variants across the
+ * components, could never render and therefore could never be verified. */
+:root {
+  --background: #E7EFE5;
+  --foreground: #13241C;
+
+  /* shadcn primitives. Only the handful `components/ui/*` and
+   * `tailwind.config.ts` actually resolve are kept; the palette this app draws
+   * with is `tailwind.config.ts`, not these. */
+  --card: 90 33% 98%;
+  --card-foreground: 152 31% 11%;
+  --popover: 90 33% 98%;
+  --popover-foreground: 152 31% 11%;
+  --destructive: 4 60% 47%;
+  --destructive-foreground: 0 0% 100%;
+  --input: 116 18% 85%;
+  --ring: 227 67% 42%;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    font-family: var(--font-body), sans-serif;
+    background-color: var(--background);
+    color: var(--foreground);
+    @apply antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display), sans-serif;
+    @apply font-semibold tracking-tight;
+  }
+
+  /* One focus style everywhere: the pen's blue, clear of the element. */
+  :focus-visible {
+    outline: 2px solid #2343B5;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* The page of a ledger: faint horizontal rules, one line of writing apart.
+   * Used behind the home page only; a sheet lying on it is plain. */
+  .ledger-rules {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 31px,
+      rgba(19, 36, 28, 0.055) 31px,
+      rgba(19, 36, 28, 0.055) 32px
+    );
+  }
+
+  /* A rubber stamp: a frame and wide-set capitals, set at a slight angle by
+   * whoever uses it. */
+  .stamp {
+    @apply inline-flex items-center gap-2 rounded-sm border-2 px-2.5 py-1 font-mono text-xs font-semibold uppercase;
+    letter-spacing: 0.14em;
+  }
+}
+
+/* The exhibit's entrance is decoration. A reader who asked for less motion
+ * gets the finished page. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-row-in,
+  .animate-mark-in,
+  .animate-stamp-in {
+    animation: none !important;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #E7EFE5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #8FA596;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4C6156;
+}
+
+/* ---------------------------------------------------------------------------
+ * Chart tokens, read by `components/chat/blocks/chart/`.
+ *
+ * Values come from the data-viz reference palette. The slot ORDER of the
+ * categorical hues is the colorblind-safety mechanism, not a cosmetic choice,
+ * so assign them in order and never cycle past the last one.
+ * ------------------------------------------------------------------------ */
+.viz-root {
+  color-scheme: light;
+  --viz-surface: #fcfcfb;
+  --viz-ink: #0b0b0b;
+  --viz-ink-muted: #898781;
+  --viz-grid: #e1e0d9;
+  --viz-axis: #c3c2b7;
+  /* Single-series bars and lines use one hue (sequential), never one hue per bar. */
+  --viz-seq: #2a78d6;
+  --viz-series-1: #2a78d6;
+  --viz-series-2: #eb6834;
+  --viz-series-3: #1baf7a;
+  --viz-series-4: #eda100;
+}
