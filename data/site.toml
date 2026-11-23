@@ -208,6 +208,9 @@ sessionLabel = "Session"
 policiesLabel = "Policies"
 categoriesLabel = "Categories"
 flaggedCallsLabel = "Flagged calls"
+# Before the Claude models that wrote the answer. Two models mean the first
+# declined a call and a fallback model answered it.
+judgedByLabel = "Judged by"
 # Shown instead of an answer when the model declined to read the request.
 refusalTitle = "The model declined this request"
 

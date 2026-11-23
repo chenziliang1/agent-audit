@@ -35,6 +35,12 @@ export interface AuditAgentResponse {
   verdicts: SessionVerdict[]
   /** The model declined to answer: nothing was audited. */
   refused: boolean
+  /**
+   * The Claude models that wrote the answer, in the order first used. More
+   * than one when a model call was answered by a fallback model; empty from a
+   * runtime that does not say.
+   */
+  models: string[]
 }
 
 /** The agent answered with something that is not an `AuditAgentResponse`. */
@@ -99,8 +105,9 @@ export function toRuntimeSessionId(chatId: unknown, random: () => string): strin
  * an answer of another shape (an error body, an older runtime) must fail here
  * with the field's name, not as `undefined` inside a component.
  *
- * `refused` may be missing: a runtime deployed before the field existed does
- * not send it, and it never refused.
+ * `refused` and `models` may be missing: a runtime deployed before either
+ * field existed does not send it. Such a runtime never refused, and which
+ * model answered is then not known.
  */
 export function parseAgentResponse(raw: unknown): AuditAgentResponse {
   if (!isRecord(raw)) throw new AgentResponseError("the answer is not an object")
@@ -113,6 +120,7 @@ export function parseAgentResponse(raw: unknown): AuditAgentResponse {
     result: raw.result,
     verdicts: raw.verdicts.map(parseVerdict),
     refused: raw.refused === true,
+    models: raw.models === undefined ? [] : stringList(raw.models, "models"),
   }
 }
 

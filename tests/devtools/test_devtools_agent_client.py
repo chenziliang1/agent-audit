@@ -14,6 +14,7 @@ def test_invoke_agent(agent_url):
         "result": "answer to hi in session None",
         "verdicts": [],
         "refused": False,
+        "models": [],
     }
     # the session ID reaches the agent through the AgentCore header
     answer = invoke_agent(agent_url, {"prompt": "hi"}, session_id="s" * 33)

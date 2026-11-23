@@ -148,6 +148,8 @@ export interface SiteConfig {
       policiesLabel: string
       categoriesLabel: string
       flaggedCallsLabel: string
+      /** Before the models that wrote the answer a verdict belongs to. */
+      judgedByLabel: string
       refusalTitle: string
     }
     suggestedActions: SuggestedAction[]
@@ -211,5 +213,6 @@ export const REQUIRED_SITE_KEYS: readonly string[] = [
   "chat.verdict.policiesLabel",
   "chat.verdict.categoriesLabel",
   "chat.verdict.flaggedCallsLabel",
+  "chat.verdict.judgedByLabel",
   "chat.verdict.refusalTitle",
 ]

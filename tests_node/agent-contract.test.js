@@ -65,12 +65,16 @@ test('toRuntimeSessionId maps a chat to one session AgentCore accepts', () => {
 test('parseAgentResponse accepts the agent contract', () => {
   const clean = { ...VERDICT, risky: false, severity: 'none', categories: [], policy_ids: [], flagged_call_ids: [] };
   const answer = parseAgentResponse({ result: 'ok', verdicts: [VERDICT, clean], refused: false });
-  assert.deepStrictEqual(answer, { result: 'ok', verdicts: [VERDICT, clean], refused: false });
+  assert.deepStrictEqual(answer, { result: 'ok', verdicts: [VERDICT, clean], refused: false, models: [] });
+  // the models that wrote the answer, as the runtime names them
+  const judged = parseAgentResponse({ result: 'ok', verdicts: [], models: ['widget-2', 'widget-1'] });
+  assert.deepStrictEqual(judged.models, ['widget-2', 'widget-1']);
   // a refusal carries no verdict
   assert.deepStrictEqual(parseAgentResponse({ result: 'declined', verdicts: [], refused: true }), {
     result: 'declined',
     verdicts: [],
     refused: true,
+    models: [],
   });
   // a runtime from before `refused` existed never refused
   assert.strictEqual(parseAgentResponse({ result: 'ok', verdicts: [] }).refused, false);
@@ -87,6 +91,8 @@ test('parseAgentResponse names the field that is wrong', () => {
     [{ error: 'boom' }, 'result is not a string'],
     [{ result: 'ok' }, 'verdicts is not a list'],
     [{ result: 'ok', verdicts: [], refused: 'no' }, 'refused is not a boolean'],
+    [{ result: 'ok', verdicts: [], models: 'widget-2' }, 'models is not a list of strings'],
+    [{ result: 'ok', verdicts: [], models: [2] }, 'models is not a list of strings'],
     [{ result: 'ok', verdicts: ['x'] }, 'verdicts[0] is not an object'],
     [{ result: 'ok', verdicts: [{ ...VERDICT, session_id: 1 }] }, 'verdicts[0].session_id is not a string'],
     [{ result: 'ok', verdicts: [{ ...VERDICT, risky: 'yes' }] }, 'verdicts[0].risky is not a boolean'],

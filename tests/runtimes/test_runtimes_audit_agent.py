@@ -4,6 +4,7 @@ from agent_app.runtimes.audit_agent import make_record_verdict_tool
 from agent_app.runtimes.audit_agent import make_agent
 from agent_app.runtimes.audit_agent import build_agent
 from agent_app.runtimes.audit_agent import verdict_log
+from agent_app.runtimes.audit_agent import model_log
 from agent_app.runtimes.audit_agent import app
 from agent_app.runtimes.audit_agent import invoke
 from agent_app.runtimes.audit_agent import main
@@ -16,6 +17,7 @@ from agent_app.tests import FakeAgentResult
 from agent_app.config.api import Config
 from agent_app.audit import audit_agent as definition
 from agent_app.audit.audit_agent import VerdictLog
+from agent_app.audit.audit_agent import ModelLog
 from agent_app.runtimes import audit_agent
 from agent_app.runtimes.common import ProcessAgent
 from agent_app.runtimes.mcp_connection import get_runtime_arn_env_var
@@ -80,12 +82,14 @@ def test_make_agent(mcp_url):
     The agent has its own tool and the MCP tools, loaded over HTTP, and a model
     on the Anthropic API with the key it was given; no LLM call.
     """
+    log = ModelLog()
     agent = make_agent(
         "acme-widget-model-1",
         "fake-key",
         mcp_url,
         VerdictLog(),
         fallback_model_id="acme-widget-model-0",
+        model_log=log,
     )
     try:
         assert sorted(agent.tool_names) == TOOL_NAMES
@@ -96,6 +100,7 @@ def test_make_agent(mcp_url):
         assert model_config["cache_config"].strategy == "auto"
         assert agent.model.client.api_key == "fake-key"
         assert agent.model.fallback_model_id == "acme-widget-model-0"
+        assert agent.model.model_log is log
         # every model call asks for the server-side fallback: the beta header
         # and the body field reach the Anthropic SDK as its extra_* arguments
         request = agent.model.format_request(
@@ -121,6 +126,8 @@ def test_build_agent(mcp_url, monkeypatch):
         assert agent.model.client.api_key == one.config.anthropic_api_key
         fallback_model_id = agent.model.fallback_model_id
         assert fallback_model_id == one.config.audit_agent_fallback_model_id
+        # the agent's model writes to the log invoke() reads
+        assert agent.model.model_log is model_log
         # the agent's tool writes to the log invoke() reads
         agent.tool.record_verdict(session_id="ses_002", **CLEAN)
         assert [verdict.session_id for verdict in verdict_log.verdicts] == ["ses_002"]
@@ -133,10 +140,12 @@ class FakeAgent:
     """
     Stands in for the Strands agent: records a verdict on the session the
     prompt names, as the model would through the tool, then answers. A prompt
-    that starts with ``refused`` is one the model declines after that.
+    that starts with ``refused`` is one the model declines after that. Its
+    model notes itself in the log first, as the real one does.
     """
 
     def __call__(self, prompt):
+        model_log.record(f"model-for-{prompt}")
         definition.record_verdict(verdict_log, session_id=prompt, **CLEAN)
         if prompt.startswith("refused"):
             return FakeAgentResult("", stop_reason="refusal")
@@ -155,9 +164,12 @@ def test_invoke(monkeypatch):
     answer = invoke({"prompt": "ses_001"})
     assert answer["result"] == "answer to ses_001"
     assert answer["verdicts"] == [{"session_id": "ses_001", **CLEAN}]
+    assert answer["models"] == ["model-for-ses_001"]
     answer = invoke({"prompt": "ses_003"})
     assert [verdict["session_id"] for verdict in answer["verdicts"]] == ["ses_003"]
     assert answer["refused"] is False
+    # the models of this answer only
+    assert answer["models"] == ["model-for-ses_003"]
 
 
 def test_invoke_refused(monkeypatch):
@@ -179,6 +191,7 @@ def test_invoke_refused(monkeypatch):
         "result": definition.REFUSAL_ANSWER,
         "verdicts": [],
         "refused": True,
+        "models": ["model-for-refused ses_004"],
     }
     answer = invoke({"prompt": "ses_005"})
     assert answer["refused"] is False

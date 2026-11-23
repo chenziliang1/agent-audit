@@ -96,6 +96,7 @@ class AuditAgentResponse(BaseModel):
     result: str = Field(description="The answer, without the model's thinking; a fixed explanation when refused.")
     verdicts: list[SessionVerdict] = Field(description="The verdict of every session audited for this answer, in the order first recorded; empty when the question audited none, or when refused.")
     refused: bool = Field(default=False, description="True when the model declined to answer: nothing was audited, which says nothing about the session. The conversation ended; the next request starts a new one.")
+    models: list[str] = Field(default_factory=list, description="The Claude models that wrote this answer, as the model API names them, in the order first used. More than one when a model call was answered by a fallback model.")
     # fmt: on
 
 
@@ -110,13 +111,20 @@ REFUSAL_ANSWER = (
 )
 
 
-def refused_response() -> AuditAgentResponse:
+def refused_response(models: list[str] | None = None) -> AuditAgentResponse:
     """
     What the agent answers when the model declined to: the refusal said in
     words and as data, and no verdict, not even one recorded before the model
     stopped, because the answer those verdicts belong to was never written.
+
+    :param models: the models that were asked, the one that declined included.
     """
-    return AuditAgentResponse(result=REFUSAL_ANSWER, verdicts=[], refused=True)
+    return AuditAgentResponse(
+        result=REFUSAL_ANSWER,
+        verdicts=[],
+        refused=True,
+        models=models or [],
+    )
 
 
 class VerdictReceipt(BaseModel):
@@ -160,6 +168,40 @@ class VerdictLog:
         The verdicts, in the order their sessions were first recorded.
         """
         return list(self._by_session.values())
+
+
+class ModelLog:
+    """
+    Which models wrote the answer of one invocation of the agent.
+
+    The model named in the config is only the one asked first: a model call it
+    declines may be answered by a fallback model. The runtime gives the agent's
+    model one log, empties it before each invocation, and reads it after.
+    """
+
+    def __init__(self):
+        self._models: list[str] = []
+
+    def record(self, model: str) -> None:
+        """
+        Note that ``model`` answered a model call. A model already noted keeps
+        its place.
+        """
+        if model not in self._models:
+            self._models.append(model)
+
+    def clear(self) -> None:
+        """
+        Forget every model.
+        """
+        self._models.clear()
+
+    @property
+    def models(self) -> list[str]:
+        """
+        The models, in the order they first answered.
+        """
+        return list(self._models)
 
 
 def record_verdict(

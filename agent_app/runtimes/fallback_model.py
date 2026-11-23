@@ -25,6 +25,11 @@ the evaluation of 2026-11-21:
 
 To do either, a model call's response is read to its end before any of it is
 passed on. The agent answers once, when it is done, so nothing is lost.
+
+The class also knows which model answered each call, which the agent's result
+does not say: the stream's ``message_start`` names the model that is answering,
+and a ``fallback`` block the model that took over. It notes that model in a
+:class:`~agent_app.audit.audit_agent.ModelLog` when it is given one.
 """
 
 from __future__ import annotations
@@ -34,6 +39,7 @@ import logging
 
 from strands.models.anthropic import AnthropicModel
 
+from ..audit.audit_agent import ModelLog
 from .common import STOP_REASON_REFUSAL
 
 logger = logging.getLogger(__name__)
@@ -125,20 +131,36 @@ class FallbackAnthropicModel(AnthropicModel):
         the API returns the configured model's refusal; None to return the
         refusal as it is. For a ``cyber`` refusal of ``claude-sonnet-5-5`` the
         API itself falls back to ``claude-sonnet-5``.
+    :param model_log: where the model that answered each call is noted; None
+        to note it nowhere.
     """
 
-    def __init__(self, *, fallback_model_id: str | None = None, **kwargs: T.Any):
+    def __init__(
+        self,
+        *,
+        fallback_model_id: str | None = None,
+        model_log: ModelLog | None = None,
+        **kwargs: T.Any,
+    ):
         super().__init__(**kwargs)
         self.fallback_model_id = fallback_model_id
+        self.model_log = model_log
         self._block_types: dict[int, str] = {}
+        self._answered_by: str | None = None
 
     def format_chunk(self, event: dict[str, T.Any]) -> T.Any:
         """
-        As ``AnthropicModel`` formats it; the type of every content block is
-        noted on the way, since the formatted chunk no longer says it.
+        As ``AnthropicModel`` formats it; the type of every content block and
+        the model that is answering are noted on the way, since the formatted
+        chunk no longer says either.
         """
-        if event["type"] == "content_block_start":
-            self._block_types[event["index"]] = event["content_block"]["type"]
+        if event["type"] == "message_start":
+            self._answered_by = event["message"]["model"]
+        elif event["type"] == "content_block_start":
+            block = event["content_block"]
+            self._block_types[event["index"]] = block["type"]
+            if block["type"] == FALLBACK_BLOCK:
+                self._answered_by = block["to"]["model"]
         return super().format_chunk(event)
 
     async def _attempt(self, args: tuple, kwargs: dict) -> list[dict]:
@@ -147,6 +169,7 @@ class FallbackAnthropicModel(AnthropicModel):
         what a declined model wrote before a fallback.
         """
         self._block_types = {}
+        self._answered_by = None
         chunks = []
         async for chunk in super().stream(*args, **kwargs):
             chunks.append(chunk)
@@ -175,5 +198,7 @@ class FallbackAnthropicModel(AnthropicModel):
             finally:
                 self.update_config(model_id=model_id)
             chunks = add_usage(retried, chunks)
+        if self.model_log is not None and self._answered_by is not None:
+            self.model_log.record(self._answered_by)
         for chunk in chunks:
             yield chunk

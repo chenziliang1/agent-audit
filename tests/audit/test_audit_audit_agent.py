@@ -8,6 +8,7 @@ from agent_app.audit.audit_agent import refused_response
 from agent_app.audit.audit_agent import SessionVerdict
 from agent_app.audit.audit_agent import VerdictReceipt
 from agent_app.audit.audit_agent import VerdictLog
+from agent_app.audit.audit_agent import ModelLog
 from agent_app.audit.audit_agent import record_verdict
 
 import typing as T
@@ -143,8 +144,8 @@ def test_record_verdict_refuses_a_contradiction(kwargs, message):
 
 def test_request_and_response():
     """
-    The payload contract: a non-empty prompt in; a result, verdicts, and
-    whether the model refused out; every field described.
+    The payload contract: a non-empty prompt in; a result, verdicts, whether
+    the model refused, and the models that answered out; every field described.
     """
     assert AuditAgentRequest.model_validate({"prompt": "hi"}).prompt == "hi"
     for payload in [{}, {"prompt": ""}, {"question": "hi"}]:
@@ -156,6 +157,7 @@ def test_request_and_response():
         "result": "ok",
         "verdicts": [make_verdict()],
         "refused": False,
+        "models": [],
     }
     models = [AuditAgentRequest, AuditAgentResponse, SessionVerdict, VerdictReceipt]
     for model in models:
@@ -174,6 +176,26 @@ def test_refused_response():
     assert response.result == REFUSAL_ANSWER
     assert "declined" in REFUSAL_ANSWER
     assert "no verdict" in REFUSAL_ANSWER
+    assert response.models == []
+    # the models that were asked are still named
+    assert refused_response(models=["acme-widget-model-2"]).models == [
+        "acme-widget-model-2"
+    ]
+
+
+def test_model_log():
+    """Each model once, in the order it first answered; emptied on request."""
+    log = ModelLog()
+    assert log.models == []
+    log.record("acme-widget-model-2")
+    log.record("acme-widget-model-1")
+    log.record("acme-widget-model-2")
+    assert log.models == ["acme-widget-model-2", "acme-widget-model-1"]
+    # the list handed out is a copy
+    log.models.append("acme-widget-model-0")
+    assert log.models == ["acme-widget-model-2", "acme-widget-model-1"]
+    log.clear()
+    assert log.models == []
 
 
 def test_a_verdict_is_an_evaluation_prediction():

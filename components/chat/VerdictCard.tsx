@@ -33,12 +33,18 @@ const SEVERITY_STEPS = [1, 2, 3, 4]
  * It looks like the foot of the audited page on the home page: the finding is
  * stamped, in red for a violation and in green for a clean session, and the
  * IDs are set in the face every ID on the site is set in.
+ *
+ * `models` are the models that wrote the answer this verdict belongs to: the
+ * configured model declines some sessions that quote attacks, and a fallback
+ * model then judges them. Empty when the runtime did not say.
  */
 export function VerdictCard({
   verdict,
+  models = [],
   labels,
 }: {
   verdict: SessionVerdict
+  models?: string[]
   labels: VerdictLabels
 }) {
   const level = SEVERITY_LEVEL[verdict.severity]
@@ -87,11 +93,16 @@ export function VerdictCard({
 
       <p className="mt-3 text-sm leading-relaxed text-slate-700">{verdict.rationale}</p>
 
-      {verdict.risky && (
+      {(verdict.risky || models.length > 0) && (
         <dl className="mt-3 flex flex-col gap-2 border-t border-slate-200 pt-3">
-          <ChipRow label={labels.policiesLabel} items={verdict.policy_ids} mono flagged />
-          <ChipRow label={labels.categoriesLabel} items={verdict.categories.map(humanizeCategory)} />
-          <ChipRow label={labels.flaggedCallsLabel} items={verdict.flagged_call_ids} mono />
+          {verdict.risky && (
+            <>
+              <ChipRow label={labels.policiesLabel} items={verdict.policy_ids} mono flagged />
+              <ChipRow label={labels.categoriesLabel} items={verdict.categories.map(humanizeCategory)} />
+              <ChipRow label={labels.flaggedCallsLabel} items={verdict.flagged_call_ids} mono />
+            </>
+          )}
+          <ChipRow label={labels.judgedByLabel} items={models} mono />
         </dl>
       )}
     </div>

@@ -72,9 +72,14 @@ export async function POST(request: Request): Promise<Response> {
         writer.write({ type: "data-refusal", data: { message: answer.result } })
         return
       }
-      // The verdicts first: the conclusion, then the evidence in prose.
+      // The verdicts first: the conclusion, then the evidence in prose. Each
+      // carries the models of the answer, so its card can say who judged.
       for (const verdict of answer.verdicts) {
-        writer.write({ type: "data-verdict", id: verdict.session_id, data: verdict })
+        writer.write({
+          type: "data-verdict",
+          id: verdict.session_id,
+          data: { ...verdict, models: answer.models },
+        })
       }
       writer.write({ type: "text-start", id: "answer" })
       writer.write({ type: "text-delta", id: "answer", delta: answer.result })

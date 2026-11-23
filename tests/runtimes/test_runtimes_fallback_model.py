@@ -12,6 +12,8 @@ import pytest
 from strands.event_loop.streaming import process_stream
 from strands.models.anthropic import AnthropicModel
 
+from agent_app.audit.audit_agent import ModelLog
+
 PRIMARY = "acme-widget-model-2"
 FALLBACK = "acme-widget-model-1"
 
@@ -130,9 +132,13 @@ def scripted(monkeypatch):
     return attempts, asked
 
 
-def make_model(fallback_model_id: str | None = FALLBACK) -> FallbackAnthropicModel:
+def make_model(
+    fallback_model_id: str | None = FALLBACK,
+    model_log: ModelLog | None = None,
+) -> FallbackAnthropicModel:
     return FallbackAnthropicModel(
         fallback_model_id=fallback_model_id,
+        model_log=model_log,
         client_args={"api_key": "fake-key"},
         model_id=PRIMARY,
         max_tokens=100,
@@ -238,11 +244,13 @@ class TestFallbackAnthropicModel:
                 stop("tool_use"),
             )
         )
-        stop_reason, message, usage = run(make_model())
+        log = ModelLog()
+        stop_reason, message, usage = run(make_model(model_log=log))
         assert stop_reason == "tool_use"
         assert kinds(message) == ["reasoningContent", "toolUse"]
         assert usage["outputTokens"] == 10
         assert asked == [PRIMARY]
+        assert log.models == [PRIMARY]
 
     def test_fallback_before_any_output(self, scripted):
         """The fallback model wrote all of it: all of it stays."""
@@ -279,9 +287,12 @@ class TestFallbackAnthropicModel:
                 stop("tool_use"),
             )
         )
-        stop_reason, message, _ = run(make_model())
+        log = ModelLog()
+        stop_reason, message, _ = run(make_model(model_log=log))
         assert stop_reason == "tool_use"
         assert kinds(message) == ["text", "reasoningContent", "toolUse"]
+        # the call began on one model and was answered by the other
+        assert log.models == [FALLBACK]
         reasoning = message["content"][1]["reasoningContent"]["reasoningText"]
         assert reasoning["signature"] == "sig-b"
         assert message["content"][2]["toolUse"]["toolUseId"] == "tool-1"
@@ -309,12 +320,15 @@ class TestFallbackAnthropicModel:
                 stop("tool_use"),
             )
         )
-        model = make_model()
+        log = ModelLog()
+        model = make_model(model_log=log)
         stop_reason, message, usage = run(model)
         assert stop_reason == "tool_use"
         assert kinds(message) == ["reasoningContent", "toolUse"]
         assert message["content"][1]["toolUse"]["toolUseId"] == "tool-1"
         assert asked == [PRIMARY, FALLBACK]
+        # the declined attempt answered nothing: only the second model is noted
+        assert log.models == [FALLBACK]
         assert model.get_config()["model_id"] == PRIMARY
         # both attempts were paid for
         assert usage["inputTokens"] == 200

@@ -30,6 +30,7 @@ from ..one.api import one
 from ..audit import audit_agent
 from ..audit.audit_agent import SYSTEM_PROMPT
 from ..audit.audit_agent import Severity
+from ..audit.audit_agent import ModelLog
 from ..audit.audit_agent import VerdictLog
 from ..audit.audit_agent import VerdictReceipt
 from ..audit.audit_agent import AuditAgentRequest
@@ -105,6 +106,7 @@ def make_agent(
     log: VerdictLog,
     mcp_auth: httpx.Auth | None = None,
     fallback_model_id: str | None = None,
+    model_log: ModelLog | None = None,
 ) -> Agent:
     """
     The agent on the Claude model ``model_id``, called on the Anthropic API
@@ -121,11 +123,13 @@ def make_agent(
     one the Anthropic API falls back to (:data:`FALLBACK_PARAMS`), or
     ``fallback_model_id`` when the API returns the refusal instead
     (:class:`~agent_app.runtimes.fallback_model.FallbackAnthropicModel`). So
-    ``model_id`` is the model asked first, not always the one that judged.
+    ``model_id`` is the model asked first, not always the one that judged;
+    ``model_log``, when given, is told which one answered each model call.
     """
     return Agent(
         model=FallbackAnthropicModel(
             fallback_model_id=fallback_model_id,
+            model_log=model_log,
             client_args={"api_key": api_key},
             model_id=model_id,
             max_tokens=MAX_TOKENS,
@@ -144,12 +148,16 @@ def make_agent(
 #: The verdicts of the invocation in progress; the agent's tool writes to it.
 verdict_log = VerdictLog()
 
+#: The models that answered the invocation in progress; the agent's model
+#: writes to it.
+model_log = ModelLog()
+
 
 def build_agent() -> Agent:
     """
     :func:`make_agent` with the dependencies of this process: ``audit_agent_model_id``,
-    ``audit_agent_fallback_model_id`` and ``anthropic_api_key`` of the config, the ``AuditMcp`` connection, and
-    :data:`verdict_log`.
+    ``audit_agent_fallback_model_id`` and ``anthropic_api_key`` of the config,
+    the ``AuditMcp`` connection, :data:`verdict_log`, and :data:`model_log`.
 
     The boto session only signs the requests to a deployed MCP runtime; a local
     MCP server is reached without it. It is a new session of the environment
@@ -167,14 +175,16 @@ def build_agent() -> Agent:
         log=verdict_log,
         mcp_auth=mcp_auth,
         fallback_model_id=one.config.audit_agent_fallback_model_id,
+        model_log=model_log,
     )
 
 
 #: The agent of this process, built by :func:`build_agent` on the first invocation.
 agent = ProcessAgent(build_agent)
 
-#: One invocation at a time, from emptying the verdict log to reading it: the
-#: verdicts returned are the ones of this invocation, never of a concurrent one.
+#: One invocation at a time, from emptying the two logs to reading them: the
+#: verdicts and models returned are the ones of this invocation, never of a
+#: concurrent one.
 _invoke_lock = threading.Lock()
 
 app = BedrockAgentCoreApp()
@@ -184,7 +194,8 @@ app = BedrockAgentCoreApp()
 def invoke(payload: dict) -> dict:
     """
     Answer an :class:`AuditAgentRequest` with an :class:`AuditAgentResponse`,
-    as JSON: the agent's text, and the verdicts it recorded while answering. A
+    as JSON: the agent's text, the verdicts it recorded while answering, and
+    the models that answered. A
     payload that does not validate is the caller's mistake: a 400 with
     pydantic's errors, before the agent is built or the model called
     (``BedrockAgentCoreApp`` answers any other exception with a 500).
@@ -200,13 +211,19 @@ def invoke(payload: dict) -> dict:
         raise HTTPException(status_code=400, detail=errors)
     with _invoke_lock:
         verdict_log.clear()
+        model_log.clear()
         try:
             answer = strip_thinking(agent(request.prompt))
         except ModelRefusal:
             app.logger.warning("The model declined to answer; conversation reset")
-            return refused_response().model_dump()
+            return refused_response(models=model_log.models).model_dump()
         verdicts = verdict_log.verdicts
-    return AuditAgentResponse(result=answer, verdicts=verdicts).model_dump()
+        models = model_log.models
+    return AuditAgentResponse(
+        result=answer,
+        verdicts=verdicts,
+        models=models,
+    ).model_dump()
 
 
 def main():

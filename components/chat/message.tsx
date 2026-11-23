@@ -85,10 +85,13 @@ export const PreviewMessage = ({
 
         <div
           className={cn(
-            "flex flex-col gap-2 max-w-[85%] sm:max-w-[78%] rounded-md px-4 py-3.5",
+            "flex flex-col gap-2 rounded-md px-4 py-3.5",
+            // An answer may take the whole row beside its avatar (2rem plus
+            // the gap): a table of four columns needs the width. A question
+            // stays narrower, so the two sides read apart.
             message.role === "user"
-              ? "bg-primary text-primary-foreground"
-              : "border border-slate-300 bg-sheet"
+              ? "max-w-[85%] sm:max-w-[78%] bg-primary text-primary-foreground"
+              : "min-w-0 max-w-[calc(100%-2.75rem)] border border-slate-300 bg-sheet"
           )}
         >
           {/* AI SDK v5: Use parts instead of content */}
@@ -106,7 +109,12 @@ export const PreviewMessage = ({
                 // Both arrive as data parts from /api/chat (lib/agent/message.ts).
                 if (part.type === 'data-verdict' && part.data) {
                   return (
-                    <VerdictCard key={index} verdict={part.data} labels={verdictLabels} />
+                    <VerdictCard
+                      key={index}
+                      verdict={part.data}
+                      models={part.data.models}
+                      labels={verdictLabels}
+                    />
                   );
                 }
                 if (part.type === 'data-refusal' && part.data) {
