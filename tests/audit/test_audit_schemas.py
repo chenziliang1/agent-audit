@@ -22,7 +22,7 @@ def get_models() -> list[type[Record]]:
 def test_every_field_is_described():
     """The LLM reads the field descriptions as the tools' output schema."""
     models = get_models()
-    assert len(models) == 16
+    assert len(models) == 18
     for model in models:
         for name, field in model.model_fields.items():
             assert field.description, f"{model.__name__}.{name}"

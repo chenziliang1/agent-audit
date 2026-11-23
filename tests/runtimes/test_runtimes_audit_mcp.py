@@ -51,33 +51,32 @@ def test_list_tools():
 
 
 @pytest.mark.parametrize(
-    "name, arguments, key, expected",
+    "name, arguments, rows, key, expected",
     [
-        ("list_policies", {}, "policy_id", ["P-01", "P-02"]),
-        ("list_tool_definitions", {"side_effect": "read"}, "name", ["ticket.get"]),
+        ("list_policies", {}, "policies", "policy_id", ["P-01", "P-02"]),
+        (
+            "list_tool_definitions",
+            {"side_effect": "read"},
+            "tools",
+            "name",
+            ["ticket.get"],
+        ),
+        ("list_agents", {"role": "coding"}, "agents", "agent_id", ["agt_b2"]),
     ],
 )
-def test_call_list_tool(name, arguments, key, expected):
+def test_call_list_tool(name, arguments, rows, key, expected):
     """
-    A list tool reaches its query through one.audit_store; FastMCP wraps a
-    list result in the structured output, ``{"result": [...]}``.
+    A list tool reaches its query through one.audit_store, and answers with an
+    object that states the count, not with a bare list.
     """
-    _, structured = asyncio.run(mcp.call_tool(name, arguments))
-    assert [row[key] for row in structured["result"]] == expected
+    _, listed = asyncio.run(mcp.call_tool(name, arguments))
+    assert listed["total"] == len(expected)
+    assert [row[key] for row in listed[rows]] == expected
 
 
 def test_call_tool_get_org_context():
     _, org = asyncio.run(mcp.call_tool("get_org_context", {}))
     assert org["company"] == "Acme Corp"
-
-
-def test_call_tool_list_agents():
-    """
-    The agents come with their count, as an object, not as a bare list.
-    """
-    _, listed = asyncio.run(mcp.call_tool("list_agents", {"role": "coding"}))
-    assert listed["total"] == 1
-    assert [row["agent_id"] for row in listed["agents"]] == ["agt_b2"]
 
 
 def test_call_tool_get_agent():

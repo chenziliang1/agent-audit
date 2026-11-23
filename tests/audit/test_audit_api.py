@@ -6,9 +6,11 @@ from agent_app.audit import api
 def test():
     _ = api
     _ = api.Policy
+    _ = api.PolicyList
     _ = api.VerifiedVendor
     _ = api.OrgContext
     _ = api.ToolDefinition
+    _ = api.ToolDefinitionList
     _ = api.AgentInfo
     _ = api.AgentList
     _ = api.AgentDetail

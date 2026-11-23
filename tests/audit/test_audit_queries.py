@@ -18,9 +18,10 @@ from agent_app.audit.schemas import Trigger
 
 
 def test_list_policies(audit_store):
-    policies = list_policies(audit_store)
-    assert [policy.policy_id for policy in policies] == ["P-01", "P-02"]
-    assert policies is not audit_store.policies
+    listed = list_policies(audit_store)
+    assert listed.total == 2
+    assert [policy.policy_id for policy in listed.policies] == ["P-01", "P-02"]
+    assert listed.policies is not audit_store.policies
 
 
 def test_get_org_context(audit_store):
@@ -30,10 +31,16 @@ def test_get_org_context(audit_store):
 
 
 def test_list_tool_definitions(audit_store):
-    assert len(list_tool_definitions(audit_store)) == 3
-    tools = list_tool_definitions(audit_store, side_effect="financial")
-    assert [tool.name for tool in tools] == ["payments.refund"]
-    assert list_tool_definitions(audit_store, side_effect="magic") == []
+    listed = list_tool_definitions(audit_store)
+    assert listed.total == 3
+    assert len(listed.tools) == 3
+    assert listed.tools is not audit_store.tools
+    financial = list_tool_definitions(audit_store, side_effect="financial")
+    assert financial.total == 1
+    assert [tool.name for tool in financial.tools] == ["payments.refund"]
+    unknown = list_tool_definitions(audit_store, side_effect="magic")
+    assert unknown.total == 0
+    assert unknown.tools == []
 
 
 def test_list_agents(audit_store):

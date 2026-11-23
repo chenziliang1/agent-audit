@@ -14,9 +14,9 @@ from __future__ import annotations
 
 from ..one.api import one
 from ..audit import queries
-from ..audit.schemas import Policy
+from ..audit.schemas import PolicyList
 from ..audit.schemas import OrgContext
-from ..audit.schemas import ToolDefinition
+from ..audit.schemas import ToolDefinitionList
 from ..audit.schemas import AgentList
 from ..audit.schemas import AgentDetail
 from ..audit.schemas import SessionPage
@@ -33,7 +33,7 @@ mcp = new_mcp_server("AuditMcp")
 
 @mcp.tool()
 @doc_from(queries.list_policies)
-def list_policies() -> list[Policy]:
+def list_policies() -> PolicyList:
     return queries.list_policies(one.audit_store)
 
 
@@ -45,7 +45,7 @@ def get_org_context() -> OrgContext:
 
 @mcp.tool()
 @doc_from(queries.list_tool_definitions)
-def list_tool_definitions(side_effect: str | None = None) -> list[ToolDefinition]:
+def list_tool_definitions(side_effect: str | None = None) -> ToolDefinitionList:
     return queries.list_tool_definitions(one.audit_store, side_effect=side_effect)
 
 

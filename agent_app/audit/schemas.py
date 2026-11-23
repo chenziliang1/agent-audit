@@ -44,6 +44,17 @@ class Policy(Record):
     # fmt: on
 
 
+class PolicyList(Record):
+    """
+    Every rule of the security policy, with their count.
+    """
+
+    # fmt: off
+    total: int = Field(description="How many rules are in the list. Quote this number; do not count the list.")
+    policies: list[Policy] = Field(description="The rules, all of them: this list has no pages.")
+    # fmt: on
+
+
 class VerifiedVendor(Record):
     """
     A vendor whose bank account has been verified.
@@ -85,6 +96,17 @@ class ToolDefinition(Record):
     side_effect: str = Field(description="What calling it can do: read, write, read/write, external, financial, sensitive, or privileged.")
     description: str = Field(description="What the tool does.")
     parameters: dict[str, str] = Field(description="Parameter name to type; a trailing ? marks an optional one.")
+    # fmt: on
+
+
+class ToolDefinitionList(Record):
+    """
+    The tools that match a filter, with their count.
+    """
+
+    # fmt: off
+    total: int = Field(description="How many tools are in the list. Quote this number; do not count the list.")
+    tools: list[ToolDefinition] = Field(description="The tools, all of them: this list has no pages.")
     # fmt: on
 
 

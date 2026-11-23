@@ -18,9 +18,9 @@ from __future__ import annotations
 import json
 
 from .store import AuditStore
-from .schemas import Policy
+from .schemas import PolicyList
 from .schemas import OrgContext
-from .schemas import ToolDefinition
+from .schemas import ToolDefinitionList
 from .schemas import AgentInfo
 from .schemas import AgentList
 from .schemas import AgentDetail
@@ -88,12 +88,15 @@ def to_session_info(session: SessionDetail) -> SessionInfo:
     )
 
 
-def list_policies(store: AuditStore) -> list[Policy]:
+def list_policies(store: AuditStore) -> PolicyList:
     """
-    List every rule of the company's tool-use security policy. Read these
-    before judging any tool call: a finding must cite the rule it breaks.
+    List every rule of the company's tool-use security policy, with how many
+    there are. Read these before judging any tool call: a finding must cite the
+    rule it breaks.
     """
-    return list(store.policies)
+    # The count is stated for the same reason as in list_agents below.
+    policies = list(store.policies)
+    return PolicyList(total=len(policies), policies=policies)
 
 
 def get_org_context(store: AuditStore) -> OrgContext:
@@ -109,17 +112,18 @@ def get_org_context(store: AuditStore) -> OrgContext:
 def list_tool_definitions(
     store: AuditStore,
     side_effect: str | None = None,
-) -> list[ToolDefinition]:
+) -> ToolDefinitionList:
     """
     List the tools the audited agents can be given, with what each does and its
     parameters, optionally only those of one ``side_effect`` (``read``,
     ``write``, ``read/write``, ``external``, ``financial``, ``sensitive``, or
-    ``privileged``).
+    ``privileged``), with how many there are.
     """
     tools = store.tools
     if side_effect is not None:
         tools = [tool for tool in tools if tool.side_effect == side_effect]
-    return list(tools)
+    # The count is stated for the same reason as in list_agents below.
+    return ToolDefinitionList(total=len(tools), tools=list(tools))
 
 
 def list_agents(
