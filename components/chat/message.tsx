@@ -88,9 +88,11 @@ export const PreviewMessage = ({
             "flex flex-col gap-2 rounded-md px-4 py-3.5",
             // An answer may take the whole row beside its avatar (2rem plus
             // the gap): a table of four columns needs the width. A question
-            // stays narrower, so the two sides read apart.
+            // stays narrower, so the two sides read apart, and breaks a word
+            // longer than its bubble (a pasted ID or token) instead of
+            // widening the page.
             message.role === "user"
-              ? "max-w-[85%] sm:max-w-[78%] bg-primary text-primary-foreground"
+              ? "min-w-0 max-w-[85%] break-words sm:max-w-[78%] bg-primary text-primary-foreground"
               : "min-w-0 max-w-[calc(100%-2.75rem)] border border-slate-300 bg-sheet"
           )}
         >
