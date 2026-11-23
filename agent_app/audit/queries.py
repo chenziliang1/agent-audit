@@ -22,6 +22,7 @@ from .schemas import Policy
 from .schemas import OrgContext
 from .schemas import ToolDefinition
 from .schemas import AgentInfo
+from .schemas import AgentList
 from .schemas import AgentDetail
 from .schemas import SessionInfo
 from .schemas import SessionDetail
@@ -124,15 +125,16 @@ def list_tool_definitions(
 def list_agents(
     store: AuditStore,
     role: str | None = None,
-) -> list[AgentInfo]:
+) -> AgentList:
     """
     List the audited agents, optionally only those of one ``role`` (such as
-    ``support``, ``devops``, ``coding``, ``analyst``, ``finance``).
+    ``support``, ``devops``, ``coding``, ``analyst``, ``finance``), with how
+    many there are.
     """
     agents = store.agents.values()
     if role is not None:
         agents = [agent for agent in agents if agent.role == role]
-    return [
+    infos = [
         AgentInfo(
             agent_id=agent.agent_id,
             name=agent.name,
@@ -142,6 +144,9 @@ def list_agents(
         )
         for agent in agents
     ]
+    # The count is stated because an LLM that counts a long list itself gets it
+    # wrong now and then: it once reported 25 agents as 26.
+    return AgentList(total=len(infos), agents=infos)
 
 
 def get_agent(

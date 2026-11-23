@@ -10,6 +10,7 @@ def test():
     _ = api.OrgContext
     _ = api.ToolDefinition
     _ = api.AgentInfo
+    _ = api.AgentList
     _ = api.AgentDetail
     _ = api.AgentSnapshot
     _ = api.Trigger

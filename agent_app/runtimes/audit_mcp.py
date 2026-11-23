@@ -17,7 +17,7 @@ from ..audit import queries
 from ..audit.schemas import Policy
 from ..audit.schemas import OrgContext
 from ..audit.schemas import ToolDefinition
-from ..audit.schemas import AgentInfo
+from ..audit.schemas import AgentList
 from ..audit.schemas import AgentDetail
 from ..audit.schemas import SessionPage
 from ..audit.schemas import SessionDetail
@@ -51,7 +51,7 @@ def list_tool_definitions(side_effect: str | None = None) -> list[ToolDefinition
 
 @mcp.tool()
 @doc_from(queries.list_agents)
-def list_agents(role: str | None = None) -> list[AgentInfo]:
+def list_agents(role: str | None = None) -> AgentList:
     return queries.list_agents(one.audit_store, role=role)
 
 

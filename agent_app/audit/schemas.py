@@ -119,6 +119,17 @@ class AgentDetail(AgentInfo):
     # fmt: on
 
 
+class AgentList(Record):
+    """
+    The audited agents that match a filter, with their count.
+    """
+
+    # fmt: off
+    total: int = Field(description="How many agents are in the list. Quote this number; do not count the list.")
+    agents: list[AgentInfo] = Field(description="The agents, all of them: this list has no pages.")
+    # fmt: on
+
+
 class AgentSnapshot(Record):
     """
     The permissions of the agent as they were when a session ran.

@@ -55,7 +55,6 @@ def test_list_tools():
     [
         ("list_policies", {}, "policy_id", ["P-01", "P-02"]),
         ("list_tool_definitions", {"side_effect": "read"}, "name", ["ticket.get"]),
-        ("list_agents", {"role": "coding"}, "agent_id", ["agt_b2"]),
     ],
 )
 def test_call_list_tool(name, arguments, key, expected):
@@ -70,6 +69,15 @@ def test_call_list_tool(name, arguments, key, expected):
 def test_call_tool_get_org_context():
     _, org = asyncio.run(mcp.call_tool("get_org_context", {}))
     assert org["company"] == "Acme Corp"
+
+
+def test_call_tool_list_agents():
+    """
+    The agents come with their count, as an object, not as a bare list.
+    """
+    _, listed = asyncio.run(mcp.call_tool("list_agents", {"role": "coding"}))
+    assert listed["total"] == 1
+    assert [row["agent_id"] for row in listed["agents"]] == ["agt_b2"]
 
 
 def test_call_tool_get_agent():

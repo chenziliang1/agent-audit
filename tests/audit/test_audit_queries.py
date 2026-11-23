@@ -37,7 +37,9 @@ def test_list_tool_definitions(audit_store):
 
 
 def test_list_agents(audit_store):
-    agents = list_agents(audit_store)
+    listed = list_agents(audit_store)
+    agents = listed.agents
+    assert listed.total == 2
     assert agents[0] == AgentInfo(
         agent_id="agt_a1",
         name="widget-helper-01",
@@ -47,8 +49,11 @@ def test_list_agents(audit_store):
     )
     assert [agent.agent_id for agent in agents] == ["agt_a1", "agt_b2"]
     coders = list_agents(audit_store, role="coding")
-    assert [agent.agent_id for agent in coders] == ["agt_b2"]
-    assert list_agents(audit_store, role="pilot") == []
+    assert coders.total == 1
+    assert [agent.agent_id for agent in coders.agents] == ["agt_b2"]
+    nobody = list_agents(audit_store, role="pilot")
+    assert nobody.total == 0
+    assert nobody.agents == []
 
 
 def test_get_agent(audit_store):

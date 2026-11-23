@@ -9,6 +9,7 @@ from .schemas import VerifiedVendor
 from .schemas import OrgContext
 from .schemas import ToolDefinition
 from .schemas import AgentInfo
+from .schemas import AgentList
 from .schemas import AgentDetail
 from .schemas import AgentSnapshot
 from .schemas import Trigger

@@ -31,7 +31,8 @@ def test_call_tool(mcp_url):
     session = call_tool(mcp_url, "get_session", {"session_id": "ses_001"})
     assert session["task"] == "Resolve ticket TCK-1"
     agents = call_tool(mcp_url, "list_agents", {"role": "coding"})
-    assert [row["agent_id"] for row in agents["result"]] == ["agt_b2"]
+    assert agents["total"] == 1
+    assert [row["agent_id"] for row in agents["agents"]] == ["agt_b2"]
     with pytest.raises(RuntimeError, match="session 'ses_999' not found"):
         call_tool(mcp_url, "get_session", {"session_id": "ses_999"})
 
