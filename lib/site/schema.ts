@@ -138,6 +138,8 @@ export interface SiteConfig {
       rateLimited: string
       /** The request failed the bot check (lib/agent/guard.ts). */
       botBlocked: string
+      /** The page has asked the agent all the questions of the day (lib/agent/daily-count.ts). */
+      dailyLimitReached: string
     }
     /** The words of a verdict card and of the refusal notice (components/chat/VerdictCard.tsx). */
     verdict: {
@@ -207,6 +209,7 @@ export const REQUIRED_SITE_KEYS: readonly string[] = [
   "chat.messages.promptTooLong",
   "chat.messages.rateLimited",
   "chat.messages.botBlocked",
+  "chat.messages.dailyLimitReached",
   "chat.verdict.riskyLabel",
   "chat.verdict.cleanLabel",
   "chat.verdict.sessionLabel",

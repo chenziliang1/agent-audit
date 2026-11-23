@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai"
 
 import { MAX_PROMPT_CHARS, lastUserText, toRuntimeSessionId } from "@/lib/agent/contract"
+import { countQuestion } from "@/lib/agent/daily-count"
 import { checkCaller } from "@/lib/agent/guard"
 import { invokeAuditAgent } from "@/lib/agent/invoke"
 import type { AuditUIMessage } from "@/lib/agent/message"
@@ -23,7 +24,10 @@ import { loadSite } from "@/lib/site/load"
  *
  * Every question is a paid model call, so the caller is checked first (see
  * `lib/agent/guard.ts`): a script, or a reader who asked too often, is turned
- * away before anything else is looked at.
+ * away before anything else is looked at. A question that passes is counted
+ * (see `lib/agent/daily-count.ts`): the page asks the agent a limited number of
+ * questions a day, all readers together, and a rejected request is not one of
+ * them.
  */
 
 /** An audit can take a minute; the platform default would cut a slow one off. */
@@ -63,6 +67,17 @@ export async function POST(request: Request): Promise<Response> {
     return new Response(site.chat.messages.promptTooLong, { status: 400 })
   }
   const runtimeSessionId = toRuntimeSessionId(id, randomUUID)
+
+  try {
+    if ((await countQuestion()) === "limitReached") {
+      return new Response(site.chat.messages.dailyLimitReached, { status: 429 })
+    }
+  } catch (error) {
+    // The count failed, or the limit is not configured. Nobody is answered
+    // without the count: the agent is not called.
+    console.error("[api/chat] the question could not be counted:", error)
+    return new Response(site.chat.messages.agentUnavailable, { status: 503 })
+  }
 
   const stream = createUIMessageStream<AuditUIMessage>({
     execute: async ({ writer }) => {

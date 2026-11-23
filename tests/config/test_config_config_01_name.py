@@ -39,6 +39,9 @@ def test_names(config: Config):
     assert config.iam_policy_name_agentcore_runtime == "my-project-dev-us-east-1-agentcore-runtime"
     assert config.iam_policy_arn_agentcore_runtime == "arn:aws:iam::111122223333:policy/my-project-dev-us-east-1-agentcore-runtime"
     assert config.iam_policy_url_agentcore_runtime == "https://us-east-1.console.aws.amazon.com/iam/home#/policies/details/arn%3Aaws%3Aiam%3A%3A111122223333%3Apolicy%2Fmy-project-dev-us-east-1-agentcore-runtime"
+    # dynamodb tables
+    assert config.dynamodb_table_name_chat_daily_count == "my-project-dev-chat-daily-count"
+    assert config.dynamodb_table_arn_chat_daily_count == "arn:aws:dynamodb:us-east-1:111122223333:table/my-project-dev-chat-daily-count"
     # ssm
     assert config.ssm_param_name_config == "/my-project-dev/config"
     assert config.ssm_param_arn_config == "arn:aws:ssm:us-east-1:111122223333:parameter/my-project-dev/config"

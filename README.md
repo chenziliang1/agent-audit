@@ -38,8 +38,9 @@ flowchart LR
   called on the Anthropic API.
 - The frontend is Next.js on Vercel. Its one server route signs the call to
   the agent with a role it assumes through Vercel's OIDC token, so no AWS key
-  is stored there. A bot check and a per-IP rate limit sit in front of it,
-  because every question is a paid model call.
+  is stored there. A bot check, a per-IP rate limit, and a daily limit on the
+  questions of all readers together sit in front of it, because every question
+  is a paid model call.
 
 A tool is a plain function that takes its dependencies as arguments and returns
 a Pydantic model; the FastMCP and AgentCore modules only wire them up

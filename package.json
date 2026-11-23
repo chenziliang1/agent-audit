@@ -13,6 +13,7 @@
   "dependencies": {
     "@ai-sdk/react": "^3.0.79",
     "@aws-sdk/client-bedrock-agentcore": "^3.1175.0",
+    "@aws-sdk/client-dynamodb": "^3.1176.0",
     "@radix-ui/react-slot": "^1.1.1",
     "@vercel/firewall": "^1.2.6",
     "@vercel/oidc-aws-credentials-provider": "^3.3.21",

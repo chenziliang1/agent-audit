@@ -233,6 +233,28 @@ class ConfigNameMixin:
         return f"https://us-east-1.console.aws.amazon.com/iam/home#/policies/details/{quoted_arn}"
 
     # --------------------------------------------------------------------------
+    # DynamoDB tables
+    # --------------------------------------------------------------------------
+    @cached_property
+    def dynamodb_table_name_chat_daily_count(self: Config) -> str:
+        """
+        Name of the table in which the hosted web app counts the questions of
+        a day, such as ``my-project-dev-chat-daily-count``.
+        """
+        return f"{self.prefix_name_slug}-chat-daily-count"
+
+    @cached_property
+    def dynamodb_table_arn_chat_daily_count(self: Config) -> str:
+        """
+        ARN of :attr:`dynamodb_table_name_chat_daily_count`; the value of
+        ``CHAT_DAILY_TABLE_ARN`` on the hosting platform.
+        """
+        return (
+            f"arn:aws:dynamodb:{self.aws_region}:{self.aws_account_id}"
+            f":table/{self.dynamodb_table_name_chat_daily_count}"
+        )
+
+    # --------------------------------------------------------------------------
     # CloudWatch log groups
     # --------------------------------------------------------------------------
     def get_cloudwatch_log_group_url(self: Config, log_group_name: str) -> str:

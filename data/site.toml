@@ -197,6 +197,10 @@ promptTooLong = "That question is too long. Ask it in a few sentences."
 rateLimited = "You have asked several questions in a short time. Wait a few minutes, then ask again."
 # The request did not come with the browser's answer to the bot check.
 botBlocked = "This request looked automated. Reload the page and ask again."
+# The hosted page passes a limited number of questions a day to the agent, all
+# readers together. The number is a setting of the deployment, so this names
+# none; the day is a UTC day.
+dailyLimitReached = "The auditor has reached today's limit of questions. Ask again after 00:00 UTC."
 
 # The verdict card: the agent's structured conclusion on one session, drawn
 # above its prose. The severity, the policy IDs, and the call IDs on it are the

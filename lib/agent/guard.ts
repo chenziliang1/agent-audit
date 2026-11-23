@@ -18,8 +18,8 @@ import { checkBotId } from "botid/server"
  * Neither exists outside Vercel, so on a developer machine every caller is
  * allowed: the only caller there is the developer.
  *
- * Neither is a spending cap. The cap is the spend limit of the Anthropic API
- * key's workspace.
+ * Both limit one caller. What limits all callers together is the daily count
+ * of `daily-count.ts`, which the route applies after these two.
  */
 
 /**

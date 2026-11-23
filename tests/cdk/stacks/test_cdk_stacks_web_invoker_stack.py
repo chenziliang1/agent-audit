@@ -2,7 +2,8 @@
 
 """
 Synth test of the web_invoker stack: create it through ``StackEnum``, the way
-``cdk/cdk_app.py`` does, and check who may assume the role and what it may do.
+``cdk/cdk_app.py`` does, and check who may assume the role, what it may do, and
+the table it counts in.
 """
 
 from agent_app.cdk.stacks.web_invoker_stack import (
@@ -51,7 +52,7 @@ def test_synth(config: Config):
                     }
                 ],
             },
-            # and only to invoke the one runtime
+            # and only to invoke the one runtime and count a question
             "Policies": [
                 {
                     "PolicyName": "invoke-audit-agent",
@@ -64,10 +65,37 @@ def test_synth(config: Config):
                             }
                         ],
                     },
-                }
+                },
+                {
+                    "PolicyName": "count-chat-questions",
+                    "PolicyDocument": {
+                        "Statement": [
+                            {
+                                "Action": "dynamodb:UpdateItem",
+                                "Effect": "Allow",
+                                "Resource": {
+                                    "Fn::GetAtt": [Match.any_value(), "Arn"],
+                                },
+                            }
+                        ],
+                    },
+                },
             ],
         },
     )
+    template.has_resource_properties(
+        "AWS::DynamoDB::Table",
+        {
+            "TableName": config.dynamodb_table_name_chat_daily_count,
+            "KeySchema": [{"AttributeName": "day", "KeyType": "HASH"}],
+            "BillingMode": "PAY_PER_REQUEST",
+            "TimeToLiveSpecification": {
+                "AttributeName": "expires_at",
+                "Enabled": True,
+            },
+        },
+    )
+    template.has_resource("AWS::DynamoDB::Table", {"DeletionPolicy": "Delete"})
 
 
 if __name__ == "__main__":
