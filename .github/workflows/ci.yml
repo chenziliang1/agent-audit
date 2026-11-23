@@ -27,10 +27,10 @@ jobs:
       # CDK, and AgentCore CLIs, which no check runs.
       MISE_TASK_RUN_AUTO_INSTALL: "false"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Python, uv, Node, and pnpm as pinned in mise.toml
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@v5
         with:
           install_args: python uv node pnpm
 
