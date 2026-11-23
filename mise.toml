@@ -62,8 +62,8 @@ description = "🧪 Run all unit tests (Python + Node.js)"
 depends = ["test-python", "test-node"]
 
 [tasks.cov]
-description = "🧪📊 Run Python unit tests with code coverage using pytest (generates HTML report in htmlcov/)"
-run = ".venv/bin/pytest tests -s --tb=native --cov=agent_app --cov-report term-missing --cov-report html:htmlcov"
+description = "🧪📊 Run Python unit tests with code coverage using pytest (generates HTML report in htmlcov/; fails below 100%)"
+run = ".venv/bin/pytest tests -s --tb=native --cov=agent_app --cov-report term-missing --cov-report html:htmlcov --cov-fail-under=100"
 depends = ["inst"]
 
 [tasks.int-test]

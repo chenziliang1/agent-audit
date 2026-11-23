@@ -1,5 +1,7 @@
 # Agent Audit
 
+[![CI](https://github.com/chenziliang1/agent-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/chenziliang1/agent-audit/actions/workflows/ci.yml)
+
 An AI agent that audits what other AI agents did. It reads their recorded tool
 calls, checks each one against a company's written security policy, and reports
 which sessions broke a rule, how badly, and on what evidence.
@@ -92,7 +94,9 @@ AGENT_URL=http://127.0.0.1:18734 mise run dev   # the web page, port 3000
 ```
 
 `mise run test` runs the Python and Node unit tests. None of them opens a
-network connection or calls a model.
+network connection or calls a model. Every push to `main` runs the lint, both
+test suites with the coverage check, and the web build
+(`.github/workflows/ci.yml`).
 
 ## Deploy
 

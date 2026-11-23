@@ -1,0 +1,52 @@
+# The checks of a change: lint, the Python and Node unit tests, and the web
+# build. None of them calls a model, AWS, or Vercel, and none reads a file that
+# Git ignores (.env, config/config-*-secret.json5), so the workflow needs no
+# secret: the tests build their own config.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Only the tools the checks use are installed (the step below). Without
+      # this, `mise run` would install the rest of mise.toml first: the AWS,
+      # CDK, and AgentCore CLIs, which no check runs.
+      MISE_TASK_RUN_AUTO_INSTALL: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python, uv, Node, and pnpm as pinned in mise.toml
+        uses: jdx/mise-action@v2
+        with:
+          install_args: python uv node pnpm
+
+      - name: Install the Python and Node dependencies
+        run: mise run inst-all
+
+      - name: Lint
+        run: mise run lint
+
+      - name: Python unit tests, with coverage
+        run: mise run cov
+
+      - name: Node unit tests
+        run: mise run test-node
+
+      # Also the only check of data/site.toml: a missing key, an unknown icon,
+      # or a broken set of kickstart questions fails the build.
+      - name: Build the web app
+        run: mise run build-web
