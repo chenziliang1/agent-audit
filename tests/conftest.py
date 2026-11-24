@@ -77,6 +77,7 @@ def config() -> Config:
         anthropic_api_key="fake-key-of-a-test",
         vercel_team_slug="acme-team",
         vercel_project_name="my-project",
+        vercel_oidc_provider_env_name="dev",
     )
 
 

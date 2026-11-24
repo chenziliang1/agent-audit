@@ -16,4 +16,10 @@
   // The Vercel project that hosts the web app. Only its production deployments may assume the
   // role of the web-invoker stack; the team's slug, vercel_team_slug, is in the -secret file.
   vercel_project_name: "agent-audit",
+  // The environment whose web-invoker stack creates the IAM OIDC provider of the Vercel team.
+  // IAM allows one provider per issuer in an account, so the web-invoker stacks of the other
+  // environments in that account refer to it. Never destroy that environment's stack while
+  // another one is in use. With one AWS account per environment, each config-<env>.json5
+  // names its own environment here.
+  vercel_oidc_provider_env_name: "dev",
 }

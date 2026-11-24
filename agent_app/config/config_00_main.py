@@ -62,6 +62,7 @@ class Config(
     anthropic_api_key: str = Field(repr=False)  #: The Anthropic API key the AuditAgent calls its model with, kept in ``config-<env>-secret.json5``; never shown when a config is printed.
     vercel_team_slug: str = Field()  #: The slug of the Vercel team that hosts the web app, such as ``acme-team``, kept in ``config-shared-secret.json5``: it names an account. It is in the issuer and the subject of the OIDC tokens of the team's deployments.
     vercel_project_name: str = Field()  #: The name of the Vercel project that hosts the web app, such as ``my-project``; only its deployments may assume the web invoker role.
+    vercel_oidc_provider_env_name: str = Field()  #: The environment whose web invoker stack creates the IAM OIDC provider of the Vercel team, such as ``dev``. IAM allows one provider per issuer in an account, so the stacks of the other environments refer to that one.
     # fmt: on
 
     @classmethod

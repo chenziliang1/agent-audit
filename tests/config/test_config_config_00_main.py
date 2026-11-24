@@ -19,7 +19,7 @@ class TestConfig:
         Later files override earlier ones, and a missing secret file is skipped.
         """
         (tmp_path / "config-shared.json5").write_text(
-            '{project_name: "a", aws_region: "shared", agentcore_project_name: "A", audit_agent_model_id: "m", audit_agent_fallback_model_id: "f", vercel_team_slug: "t", vercel_project_name: "p"}'
+            '{project_name: "a", aws_region: "shared", agentcore_project_name: "A", audit_agent_model_id: "m", audit_agent_fallback_model_id: "f", vercel_team_slug: "t", vercel_project_name: "p", vercel_oidc_provider_env_name: "dev"}'
         )
         (tmp_path / "config-dev.json5").write_text(
             "// comment\n{aws_account_id: '1', aws_region: 'dev'}"

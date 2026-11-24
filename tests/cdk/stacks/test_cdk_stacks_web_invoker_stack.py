@@ -98,6 +98,40 @@ def test_synth(config: Config):
     template.has_resource("AWS::DynamoDB::Table", {"DeletionPolicy": "Delete"})
 
 
+def test_synth_without_the_oidc_provider(config: Config):
+    """
+    In an environment that does not own the Vercel team's OIDC provider, the
+    stack creates none and the role trusts the existing one by its ARN.
+    """
+    one = One()
+    one.config = Config(**{**config.model_dump(), "env_name": "prd"})
+    stack_enum = StackEnum(app=cdk.App(), one=one)
+    template = Template.from_stack(stack_enum.web_invoker)
+    template.resource_count_is("AWS::IAM::OIDCProvider", 0)
+    template.has_resource_properties(
+        "AWS::IAM::Role",
+        {
+            "RoleName": "my-project-prd-us-east-1-web-invoker",
+            "AssumeRolePolicyDocument": {
+                "Statement": [
+                    {
+                        "Action": "sts:AssumeRoleWithWebIdentity",
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Federated": "arn:aws:iam::111122223333:oidc-provider/oidc.vercel.com/acme-team",
+                        },
+                        "Condition": Match.any_value(),
+                    }
+                ],
+            },
+        },
+    )
+    template.has_resource_properties(
+        "AWS::DynamoDB::Table",
+        {"TableName": "my-project-prd-chat-daily-count"},
+    )
+
+
 if __name__ == "__main__":
     from agent_app.tests import run_cov_test
 

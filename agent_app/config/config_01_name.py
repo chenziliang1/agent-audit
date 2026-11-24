@@ -181,6 +181,17 @@ class ConfigNameMixin:
         return f"https://{self.vercel_oidc_issuer}"
 
     @cached_property
+    def iam_oidc_provider_arn_vercel(self: Config) -> str:
+        """
+        ARN of the IAM OIDC provider of :attr:`vercel_oidc_issuer`; an OIDC
+        provider is named by its issuer, so this is known before it exists.
+        """
+        return (
+            f"arn:aws:iam::{self.aws_account_id}:oidc-provider"
+            f"/{self.vercel_oidc_issuer}"
+        )
+
+    @cached_property
     def vercel_oidc_audience(self: Config) -> str:
         """
         The ``aud`` claim of those tokens, such as ``https://vercel.com/acme-team``.

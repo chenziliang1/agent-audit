@@ -24,9 +24,10 @@ by a pattern built from its physical name, so it can be deployed before or
 after them.
 
 **One OIDC provider per issuer in an account.** IAM refuses a second provider
-with the same URL, so two environments that share an AWS account cannot both
-deploy this stack as it is: the second one would have to import the provider
-instead of creating it.
+with the same URL, so when environments share an AWS account only one of them
+creates it: the environment named by ``config.vercel_oidc_provider_env_name``.
+The stacks of the others refer to that provider by its ARN. Destroying the
+stack that created it leaves their roles impossible to assume.
 """
 
 from __future__ import annotations
@@ -69,13 +70,23 @@ class WebInvokerStack(cdk.Stack):
         Make AWS trust the tokens of the Vercel team: an IAM OIDC provider for
         the team's issuer, accepting the audience Vercel puts in them. No
         thumbprint is given: IAM verifies the issuer's certificate itself.
+
+        Only the environment the config names creates it; in any other, the
+        provider is the one that environment's stack created in this account.
         """
-        self.oidc_provider = iam.OidcProviderNative(
-            self,
-            "VercelOidcProvider",
-            url=self.config.vercel_oidc_issuer_url,
-            client_ids=[self.config.vercel_oidc_audience],
-        )
+        if self.config.env_name == self.config.vercel_oidc_provider_env_name:
+            self.oidc_provider = iam.OidcProviderNative(
+                self,
+                "VercelOidcProvider",
+                url=self.config.vercel_oidc_issuer_url,
+                client_ids=[self.config.vercel_oidc_audience],
+            )
+        else:
+            self.oidc_provider = iam.OidcProviderNative.from_oidc_provider_arn(
+                self,
+                "VercelOidcProvider",
+                self.config.iam_oidc_provider_arn_vercel,
+            )
 
     def s02_create_daily_count_table(self) -> None:
         """

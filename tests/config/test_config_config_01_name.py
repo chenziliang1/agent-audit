@@ -33,6 +33,7 @@ def test_names(config: Config):
     # vercel oidc
     assert config.vercel_oidc_issuer == "oidc.vercel.com/acme-team"
     assert config.vercel_oidc_issuer_url == "https://oidc.vercel.com/acme-team"
+    assert config.iam_oidc_provider_arn_vercel == "arn:aws:iam::111122223333:oidc-provider/oidc.vercel.com/acme-team"
     assert config.vercel_oidc_audience == "https://vercel.com/acme-team"
     assert config.vercel_oidc_subject == "owner:acme-team:project:my-project:environment:production"
     # iam policies
