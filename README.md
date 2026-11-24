@@ -8,6 +8,8 @@ which sessions broke a rule, how badly, and on what evidence.
 
 Live: https://agent-audit-smoky.vercel.app
 
+![The home page: one audited session, with the calls that broke a policy marked](screenshots/home.png)
+
 ## What it does
 
 Ask it about a session, an agent, or a policy in plain English. For every
@@ -15,6 +17,8 @@ session it audits, it returns a structured verdict next to its answer: risky or
 not, a severity, the policy IDs that were broken, and the IDs of the calls that
 broke them. The web page draws that verdict as a card; nothing is parsed out of
 the prose.
+
+![A verdict card above the agent's answer for one session](screenshots/verdict.png)
 
 It looks for four things: an agent that obeyed instructions hidden in something
 it read, data that left the company, an agent that used more power than its

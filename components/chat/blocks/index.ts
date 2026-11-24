@@ -1,6 +1,5 @@
 import type { ComponentType } from "react"
 
-import { ChartBlock } from "./ChartBlock"
 import { CodeBlock } from "./CodeBlock"
 import { MermaidBlock } from "./MermaidBlock"
 import type { BlockProps } from "./types"
@@ -18,7 +17,6 @@ import type { BlockProps } from "./types"
  */
 const BLOCK_RENDERERS: Record<string, ComponentType<BlockProps>> = {
   mermaid: MermaidBlock,
-  chart: ChartBlock,
 }
 
 /** Resolve a renderer for a language, falling back to plain code. */

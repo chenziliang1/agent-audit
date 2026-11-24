@@ -103,25 +103,3 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #4C6156;
 }
-
-/* ---------------------------------------------------------------------------
- * Chart tokens, read by `components/chat/blocks/chart/`.
- *
- * Values come from the data-viz reference palette. The slot ORDER of the
- * categorical hues is the colorblind-safety mechanism, not a cosmetic choice,
- * so assign them in order and never cycle past the last one.
- * ------------------------------------------------------------------------ */
-.viz-root {
-  color-scheme: light;
-  --viz-surface: #fcfcfb;
-  --viz-ink: #0b0b0b;
-  --viz-ink-muted: #898781;
-  --viz-grid: #e1e0d9;
-  --viz-axis: #c3c2b7;
-  /* Single-series bars and lines use one hue (sequential), never one hue per bar. */
-  --viz-seq: #2a78d6;
-  --viz-series-1: #2a78d6;
-  --viz-series-2: #eb6834;
-  --viz-series-3: #1baf7a;
-  --viz-series-4: #eda100;
-}

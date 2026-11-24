@@ -71,8 +71,18 @@ test('checkSuggestedActions names what is wrong', () => {
   assert.ok(checkSuggestedActions(both).some((p) => p.includes('both a table and a flowchart')));
 });
 
-// The two tests below read the real files: they are what fails when the copy
-// and the bundled dataset drift apart.
+// The tests below read the real files: they are what fails when the copy and
+// the bundled dataset drift apart.
+
+/** Every session of the bundled traces, one record per line of the file. */
+function bundledSessions() {
+  return zlib
+    .gunzipSync(fs.readFileSync(path.join(ROOT, 'agent_app', 'audit', 'data', 'traces.jsonl.gz')))
+    .toString('utf-8')
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => JSON.parse(line));
+}
 
 test('data/site.toml keeps the rules of the kickstart questions', () => {
   const site = parse(fs.readFileSync(path.join(ROOT, 'data', 'site.toml'), 'utf-8'));
@@ -84,17 +94,34 @@ test('every session ID in data/site.toml exists in the bundled traces', () => {
   const named = new Set(toml.match(/ses_[0-9a-f]{12}/g));
   assert.ok(named.size > 0);
 
-  const traces = zlib
-    .gunzipSync(fs.readFileSync(path.join(ROOT, 'agent_app', 'audit', 'data', 'traces.jsonl.gz')))
-    .toString('utf-8');
-  const recorded = new Set(
-    traces
-      .split('\n')
-      .filter((line) => line.trim() !== '')
-      .map((line) => JSON.parse(line).session_id),
-  );
+  const recorded = new Set(bundledSessions().map((session) => session.session_id));
   const missing = [...named].filter((id) => !recorded.has(id));
   assert.deepStrictEqual(missing, []);
+});
+
+test('a date in a kickstart question has sessions, of the agent the question names', () => {
+  const site = parse(fs.readFileSync(path.join(ROOT, 'data', 'site.toml'), 'utf-8'));
+  const sessions = bundledSessions();
+  let dated = 0;
+  for (const { title, action } of site.chat.suggestedActions) {
+    const agents = action.match(/agt_[0-9a-f]{12}/g) ?? [];
+    for (const date of action.match(/\d{4}-\d{2}-\d{2}/g) ?? []) {
+      dated += 1;
+      // started_at is UTC, such as 2026-01-31T08:15:00Z
+      const found = sessions.filter(
+        (session) =>
+          session.started_at.startsWith(date) &&
+          (agents.length === 0 || agents.includes(session.agent_id)),
+      );
+      assert.ok(
+        found.length > 0,
+        `"${title}" asks about ${date}, and the bundled traces have no session that day` +
+          (agents.length > 0 ? ` for ${agents.join(', ')}` : ''),
+      );
+    }
+  }
+  // If no question names a date any more, this test checks nothing: delete it.
+  assert.ok(dated > 0);
 });
 
 test('every agent ID in data/site.toml exists in the bundled agents', () => {
