@@ -65,6 +65,10 @@ class StackCtxEnum:
     def web_invoker(self) -> StackCtx:
         return self._new(self.one.config.cft_stack_name_web_invoker)
 
+    @cached_property
+    def monitoring(self) -> StackCtx:
+        return self._new(self.one.config.cft_stack_name_monitoring)
+
     def get(self, stack: str) -> StackCtx:
         """
         The entry of a stack given by name, such as ``get("agentcore_deps")``.

@@ -7,6 +7,7 @@ def test():
     _ = api
     _ = api.AgentCoreDepsStack
     _ = api.WebInvokerStack
+    _ = api.MonitoringStack
     _ = api.StackCtxEnum
     _ = api.StackEnum
 

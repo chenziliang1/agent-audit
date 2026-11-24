@@ -105,6 +105,22 @@ class ConfigNameMixin:
         return self.get_cft_stack_url(self.cft_stack_name_web_invoker)
 
     @cached_property
+    def cft_stack_name_monitoring(self: Config) -> str:
+        """
+        Name of the stack of the alarms on the deployed runtimes and on the
+        chat's daily limit, such as ``my-project-dev-monitoring``; deploy it
+        after ``ac-deploy-<env>`` and the web invoker stack.
+        """
+        return self.get_cft_stack_name("monitoring")
+
+    @cached_property
+    def cft_stack_url_monitoring(self: Config) -> str:
+        """
+        Console URL of :attr:`cft_stack_name_monitoring`.
+        """
+        return self.get_cft_stack_url(self.cft_stack_name_monitoring)
+
+    @cached_property
     def cft_stack_name_agentcore(self: Config) -> str:
         """
         Name of the stack the AgentCore CLI deploys from ``agentcore/``, such as
@@ -120,6 +136,21 @@ class ConfigNameMixin:
         Console URL of :attr:`cft_stack_name_agentcore`.
         """
         return self.get_cft_stack_url(self.cft_stack_name_agentcore)
+
+    def get_agentcore_export_name(
+        self: Config,
+        runtime_name: str,
+        attribute: str,
+    ) -> str:
+        """
+        The name under which the AgentCore stack exports an attribute of a
+        runtime, such as ``AgentCore-MyProject-dev-AuditAgent-RuntimeArn``.
+        The CLI's CDK app names its exports ``<stack>-<runtime>-<attribute>``;
+        the attributes are ``RuntimeArn``, ``RuntimeId``, and ``RoleArn``. The
+        ARN of a runtime ends in an ID AWS picks at creation, so an export is
+        the only way another stack can name it.
+        """
+        return f"{self.cft_stack_name_agentcore}-{runtime_name}-{attribute}"
 
     # --------------------------------------------------------------------------
     # IAM roles
@@ -264,6 +295,38 @@ class ConfigNameMixin:
             f"arn:aws:dynamodb:{self.aws_region}:{self.aws_account_id}"
             f":table/{self.dynamodb_table_name_chat_daily_count}"
         )
+
+    # --------------------------------------------------------------------------
+    # SNS topics
+    # --------------------------------------------------------------------------
+    @cached_property
+    def sns_topic_name_alarms(self: Config) -> str:
+        """
+        Name of the topic every alarm of this environment notifies, such as
+        ``my-project-dev-alarms``. Who is told is its subscriptions, which are
+        made by hand: an address is not a setting of this project.
+        """
+        return f"{self.prefix_name_slug}-alarms"
+
+    @cached_property
+    def sns_topic_arn_alarms(self: Config) -> str:
+        """
+        ARN of :attr:`sns_topic_name_alarms`; what ``aws sns subscribe`` takes.
+        """
+        return (
+            f"arn:aws:sns:{self.aws_region}:{self.aws_account_id}"
+            f":{self.sns_topic_name_alarms}"
+        )
+
+    # --------------------------------------------------------------------------
+    # CloudWatch alarms
+    # --------------------------------------------------------------------------
+    def get_cloudwatch_alarm_name(self: Config, short_name: str) -> str:
+        """
+        The name of an alarm, ``<prefix_name_slug>-<short_name>``, such as
+        ``my-project-dev-audit-agent-errors``.
+        """
+        return f"{self.prefix_name_slug}-{short_name}"
 
     # --------------------------------------------------------------------------
     # CloudWatch log groups

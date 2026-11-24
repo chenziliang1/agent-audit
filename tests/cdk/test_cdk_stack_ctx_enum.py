@@ -12,7 +12,11 @@ from agent_app.one.api import One
 
 
 def test_list_entry_names():
-    assert list_entry_names(StackCtxEnum) == ["agentcore_deps", "web_invoker"]
+    assert list_entry_names(StackCtxEnum) == [
+        "agentcore_deps",
+        "web_invoker",
+        "monitoring",
+    ]
 
 
 class TestStackCtxEnum:
@@ -33,7 +37,12 @@ class TestStackCtxEnum:
 
         assert stack_ctx_enum.get("agentcore_deps") is stack_ctx
         assert stack_ctx_enum.web_invoker.stack_name == "my-project-dev-web-invoker"
-        assert stack_ctx_enum.get_all() == [stack_ctx, stack_ctx_enum.web_invoker]
+        assert stack_ctx_enum.monitoring.stack_name == "my-project-dev-monitoring"
+        assert stack_ctx_enum.get_all() == [
+            stack_ctx,
+            stack_ctx_enum.web_invoker,
+            stack_ctx_enum.monitoring,
+        ]
 
 
 if __name__ == "__main__":

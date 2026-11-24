@@ -32,10 +32,11 @@ def test_synth(config: Config, tmp_path):
     names = sorted(p.name for p in tmp_path.glob("*.template.json"))
     assert names == [
         "my-project-dev-agentcore-deps.template.json",
+        "my-project-dev-monitoring.template.json",
         "my-project-dev-web-invoker.template.json",
     ]
     assert se.get("agentcore_deps") is se.agentcore_deps
-    assert se.get_all() == [se.agentcore_deps, se.web_invoker]
+    assert se.get_all() == [se.agentcore_deps, se.web_invoker, se.monitoring]
 
 
 if __name__ == "__main__":

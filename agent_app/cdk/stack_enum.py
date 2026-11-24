@@ -25,6 +25,7 @@ import aws_cdk as cdk
 from .stack_ctx_enum import list_entry_names
 from .stacks.agentcore_deps_stack import AgentCoreDepsStack
 from .stacks.web_invoker_stack import WebInvokerStack
+from .stacks.monitoring_stack import MonitoringStack
 
 if T.TYPE_CHECKING:  # pragma: no cover
     from ..one.api import One
@@ -54,6 +55,14 @@ class StackEnum:
         return WebInvokerStack(
             scope=self.app,
             **self.one.stack_ctx_enum.web_invoker.to_stack_kwargs(),
+            config=self.one.config,
+        )
+
+    @cached_property
+    def monitoring(self) -> MonitoringStack:
+        return MonitoringStack(
+            scope=self.app,
+            **self.one.stack_ctx_enum.monitoring.to_stack_kwargs(),
             config=self.one.config,
         )
 

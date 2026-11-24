@@ -66,14 +66,15 @@ def test_get_env_links(config: Config):
         config, get_stack_targets("dev"), specs, deployed_audit_agent()
     )
     resources = [link.resource for link in links]
-    assert resources[:5] == [
+    assert resources[:6] == [
         "CloudFormation stack, agentcore_deps",
         "CloudFormation stack, web_invoker",
+        "CloudFormation stack, monitoring",
         "CloudFormation stack, AgentCore runtimes",
         "SSM parameter, config",
         "IAM role, web invoker",
     ]
-    assert resources[5:] == [
+    assert resources[6:] == [
         "AgentCore runtime, AuditMcp",
         "AgentCore runtime, AuditAgent",
         "IAM role, AuditAgent execution",

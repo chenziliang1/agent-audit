@@ -105,6 +105,10 @@ runtimes depend on, and deploys both runtimes with the AgentCore CLI. It needs
 the account ID in `config/config-dev-secret.json5` and `AWS_PROFILE_FOR_DEV` in
 `.env`. The web app is deployed with `vercel deploy --prod`.
 
+`mise run cdk-up-dev-monitoring-stack`, run after the runtimes exist, adds four
+CloudWatch alarms (a failed invocation of either runtime, throttling, the daily
+limit reached) and the SNS topic they notify.
+
 ## What is left
 
 - 6 of the 225 hard-negative sessions (legitimate work that looks risky) are

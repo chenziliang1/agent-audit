@@ -26,6 +26,8 @@ def test_names(config: Config):
     assert config.cft_stack_url_agentcore_deps == "https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=my-project-dev-agentcore-deps&filteringStatus=active&viewNested=true"
     assert config.cft_stack_name_web_invoker == "my-project-dev-web-invoker"
     assert config.cft_stack_url_web_invoker == "https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=my-project-dev-web-invoker&filteringStatus=active&viewNested=true"
+    assert config.cft_stack_name_monitoring == "my-project-dev-monitoring"
+    assert config.cft_stack_url_monitoring == "https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=my-project-dev-monitoring&filteringStatus=active&viewNested=true"
     # iam roles
     assert config.iam_role_name_web_invoker == "my-project-dev-us-east-1-web-invoker"
     assert config.iam_role_arn_web_invoker == "arn:aws:iam::111122223333:role/my-project-dev-us-east-1-web-invoker"
@@ -43,6 +45,11 @@ def test_names(config: Config):
     # dynamodb tables
     assert config.dynamodb_table_name_chat_daily_count == "my-project-dev-chat-daily-count"
     assert config.dynamodb_table_arn_chat_daily_count == "arn:aws:dynamodb:us-east-1:111122223333:table/my-project-dev-chat-daily-count"
+    # sns topics
+    assert config.sns_topic_name_alarms == "my-project-dev-alarms"
+    assert config.sns_topic_arn_alarms == "arn:aws:sns:us-east-1:111122223333:my-project-dev-alarms"
+    # cloudwatch alarms
+    assert config.get_cloudwatch_alarm_name("widget-errors") == "my-project-dev-widget-errors"
     # ssm
     assert config.ssm_param_name_config == "/my-project-dev/config"
     assert config.ssm_param_arn_config == "arn:aws:ssm:us-east-1:111122223333:parameter/my-project-dev/config"
@@ -50,6 +57,7 @@ def test_names(config: Config):
     # agentcore
     assert config.cft_stack_name_agentcore == "AgentCore-MyProject-dev"
     assert config.cft_stack_url_agentcore == "https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=AgentCore-MyProject-dev&filteringStatus=active&viewNested=true"
+    assert config.get_agentcore_export_name("AuditAgent", "RuntimeArn") == "AgentCore-MyProject-dev-AuditAgent-RuntimeArn"
     assert config.agentcore_target_name == "dev"
     assert config.agentcore_runtime_name_audit_mcp == "AuditMcp"
     assert config.agentcore_runtime_physical_name_audit_mcp == "MyProject_dev_AuditMcp"

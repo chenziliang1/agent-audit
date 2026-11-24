@@ -341,6 +341,7 @@ echo '>>> cdk-synth-dev-all: Synthesize all stacks of dev to CloudFormation temp
 echo '--- CloudFormation console ---'
 echo 'agent-audit-dev-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-agentcore-deps&filteringStatus=active&viewNested=true'
 echo 'agent-audit-dev-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-web-invoker&filteringStatus=active&viewNested=true'
+echo 'agent-audit-dev-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-monitoring&filteringStatus=active&viewNested=true'
 echo '--- Run command ---'
 echo 'cdk synth'
 cdk synth
@@ -356,6 +357,7 @@ echo '>>> cdk-plan-dev-all: Plan all stacks of dev: diff against what is deploye
 echo '--- CloudFormation console ---'
 echo 'agent-audit-dev-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-agentcore-deps&filteringStatus=active&viewNested=true'
 echo 'agent-audit-dev-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-web-invoker&filteringStatus=active&viewNested=true'
+echo 'agent-audit-dev-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-monitoring&filteringStatus=active&viewNested=true'
 echo '--- Run command ---'
 echo 'cdk diff --all --method auto --profile {{env.AWS_PROFILE_FOR_DEV}}'
 cdk diff --all --method auto --profile {{env.AWS_PROFILE_FOR_DEV}}
@@ -371,6 +373,7 @@ echo '>>> cdk-up-dev-all: Deploy all stacks of dev (no approval prompt)'
 echo '--- CloudFormation console ---'
 echo 'agent-audit-dev-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-agentcore-deps&filteringStatus=active&viewNested=true'
 echo 'agent-audit-dev-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-web-invoker&filteringStatus=active&viewNested=true'
+echo 'agent-audit-dev-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-monitoring&filteringStatus=active&viewNested=true'
 echo '--- Run command ---'
 echo 'cdk deploy --all --require-approval never --profile {{env.AWS_PROFILE_FOR_DEV}}'
 cdk deploy --all --require-approval never --profile {{env.AWS_PROFILE_FOR_DEV}}
@@ -386,6 +389,7 @@ echo '>>> cdk-down-dev-all: Destroy all stacks of dev (force, no confirmation)'
 echo '--- CloudFormation console ---'
 echo 'agent-audit-dev-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-agentcore-deps&filteringStatus=active&viewNested=true'
 echo 'agent-audit-dev-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-web-invoker&filteringStatus=active&viewNested=true'
+echo 'agent-audit-dev-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-monitoring&filteringStatus=active&viewNested=true'
 echo '--- Run command ---'
 echo 'cdk destroy --all --force --profile {{env.AWS_PROFILE_FOR_DEV}}'
 cdk destroy --all --force --profile {{env.AWS_PROFILE_FOR_DEV}}
@@ -501,6 +505,62 @@ echo 'agent-audit-dev-web-invoker: https://us-east-1.console.aws.amazon.com/clou
 echo '--- Run command ---'
 echo 'cdk destroy agent-audit-dev-web-invoker --exclusively --force --profile {{env.AWS_PROFILE_FOR_DEV}}'
 cdk destroy agent-audit-dev-web-invoker --exclusively --force --profile {{env.AWS_PROFILE_FOR_DEV}}
+"""
+
+[tasks."cdk-synth-dev-monitoring-stack"]
+description = "⚪ Synthesize stack monitoring of dev to CloudFormation templates (no AWS call)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-synth-dev-monitoring-stack: Synthesize stack monitoring of dev to CloudFormation templates (no AWS call)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-monitoring&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk synth agent-audit-dev-monitoring --exclusively'
+cdk synth agent-audit-dev-monitoring --exclusively
+"""
+
+[tasks."cdk-plan-dev-monitoring-stack"]
+description = "🔵 Plan stack monitoring of dev: diff against what is deployed, through a CloudFormation change set (no deploy)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-plan-dev-monitoring-stack: Plan stack monitoring of dev: diff against what is deployed, through a CloudFormation change set (no deploy)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-monitoring&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk diff agent-audit-dev-monitoring --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_DEV}}'
+cdk diff agent-audit-dev-monitoring --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_DEV}}
+"""
+
+[tasks."cdk-up-dev-monitoring-stack"]
+description = "🟢 Deploy stack monitoring of dev (no approval prompt)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-up-dev-monitoring-stack: Deploy stack monitoring of dev (no approval prompt)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-monitoring&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk deploy agent-audit-dev-monitoring --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_DEV}}'
+cdk deploy agent-audit-dev-monitoring --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_DEV}}
+"""
+
+[tasks."cdk-down-dev-monitoring-stack"]
+description = "🔴 Destroy stack monitoring of dev (force, no confirmation)"
+dir = "cdk"
+env = { ENV_NAME = "dev" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-down-dev-monitoring-stack: Destroy stack monitoring of dev (force, no confirmation)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-dev-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-dev-monitoring&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk destroy agent-audit-dev-monitoring --exclusively --force --profile {{env.AWS_PROFILE_FOR_DEV}}'
+cdk destroy agent-audit-dev-monitoring --exclusively --force --profile {{env.AWS_PROFILE_FOR_DEV}}
 """
 
 [tasks."config-deploy-tst"]
@@ -671,6 +731,7 @@ echo '>>> cdk-synth-tst-all: Synthesize all stacks of tst to CloudFormation temp
 echo '--- CloudFormation console ---'
 echo 'agent-audit-tst-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-agentcore-deps&filteringStatus=active&viewNested=true'
 echo 'agent-audit-tst-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-web-invoker&filteringStatus=active&viewNested=true'
+echo 'agent-audit-tst-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-monitoring&filteringStatus=active&viewNested=true'
 echo '--- Run command ---'
 echo 'cdk synth'
 cdk synth
@@ -686,6 +747,7 @@ echo '>>> cdk-plan-tst-all: Plan all stacks of tst: diff against what is deploye
 echo '--- CloudFormation console ---'
 echo 'agent-audit-tst-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-agentcore-deps&filteringStatus=active&viewNested=true'
 echo 'agent-audit-tst-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-web-invoker&filteringStatus=active&viewNested=true'
+echo 'agent-audit-tst-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-monitoring&filteringStatus=active&viewNested=true'
 echo '--- Run command ---'
 echo 'cdk diff --all --method auto --profile {{env.AWS_PROFILE_FOR_TST}}'
 cdk diff --all --method auto --profile {{env.AWS_PROFILE_FOR_TST}}
@@ -701,6 +763,7 @@ echo '>>> cdk-up-tst-all: Deploy all stacks of tst (no approval prompt)'
 echo '--- CloudFormation console ---'
 echo 'agent-audit-tst-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-agentcore-deps&filteringStatus=active&viewNested=true'
 echo 'agent-audit-tst-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-web-invoker&filteringStatus=active&viewNested=true'
+echo 'agent-audit-tst-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-monitoring&filteringStatus=active&viewNested=true'
 echo '--- Run command ---'
 echo 'cdk deploy --all --require-approval never --profile {{env.AWS_PROFILE_FOR_TST}}'
 cdk deploy --all --require-approval never --profile {{env.AWS_PROFILE_FOR_TST}}
@@ -716,6 +779,7 @@ echo '>>> cdk-down-tst-all: Destroy all stacks of tst (force, no confirmation)'
 echo '--- CloudFormation console ---'
 echo 'agent-audit-tst-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-agentcore-deps&filteringStatus=active&viewNested=true'
 echo 'agent-audit-tst-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-web-invoker&filteringStatus=active&viewNested=true'
+echo 'agent-audit-tst-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-monitoring&filteringStatus=active&viewNested=true'
 echo '--- Run command ---'
 echo 'cdk destroy --all --force --profile {{env.AWS_PROFILE_FOR_TST}}'
 cdk destroy --all --force --profile {{env.AWS_PROFILE_FOR_TST}}
@@ -831,6 +895,62 @@ echo 'agent-audit-tst-web-invoker: https://us-east-1.console.aws.amazon.com/clou
 echo '--- Run command ---'
 echo 'cdk destroy agent-audit-tst-web-invoker --exclusively --force --profile {{env.AWS_PROFILE_FOR_TST}}'
 cdk destroy agent-audit-tst-web-invoker --exclusively --force --profile {{env.AWS_PROFILE_FOR_TST}}
+"""
+
+[tasks."cdk-synth-tst-monitoring-stack"]
+description = "⚪ Synthesize stack monitoring of tst to CloudFormation templates (no AWS call)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-synth-tst-monitoring-stack: Synthesize stack monitoring of tst to CloudFormation templates (no AWS call)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-monitoring&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk synth agent-audit-tst-monitoring --exclusively'
+cdk synth agent-audit-tst-monitoring --exclusively
+"""
+
+[tasks."cdk-plan-tst-monitoring-stack"]
+description = "🔵 Plan stack monitoring of tst: diff against what is deployed, through a CloudFormation change set (no deploy)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-plan-tst-monitoring-stack: Plan stack monitoring of tst: diff against what is deployed, through a CloudFormation change set (no deploy)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-monitoring&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk diff agent-audit-tst-monitoring --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_TST}}'
+cdk diff agent-audit-tst-monitoring --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_TST}}
+"""
+
+[tasks."cdk-up-tst-monitoring-stack"]
+description = "🟢 Deploy stack monitoring of tst (no approval prompt)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-up-tst-monitoring-stack: Deploy stack monitoring of tst (no approval prompt)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-monitoring&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk deploy agent-audit-tst-monitoring --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_TST}}'
+cdk deploy agent-audit-tst-monitoring --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_TST}}
+"""
+
+[tasks."cdk-down-tst-monitoring-stack"]
+description = "🔴 Destroy stack monitoring of tst (force, no confirmation)"
+dir = "cdk"
+env = { ENV_NAME = "tst" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-down-tst-monitoring-stack: Destroy stack monitoring of tst (force, no confirmation)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-tst-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-tst-monitoring&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk destroy agent-audit-tst-monitoring --exclusively --force --profile {{env.AWS_PROFILE_FOR_TST}}'
+cdk destroy agent-audit-tst-monitoring --exclusively --force --profile {{env.AWS_PROFILE_FOR_TST}}
 """
 
 [tasks."config-deploy-prd"]
@@ -1001,6 +1121,7 @@ echo '>>> cdk-synth-prd-all: Synthesize all stacks of prd to CloudFormation temp
 echo '--- CloudFormation console ---'
 echo 'agent-audit-prd-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-agentcore-deps&filteringStatus=active&viewNested=true'
 echo 'agent-audit-prd-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-web-invoker&filteringStatus=active&viewNested=true'
+echo 'agent-audit-prd-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-monitoring&filteringStatus=active&viewNested=true'
 echo '--- Run command ---'
 echo 'cdk synth'
 cdk synth
@@ -1016,6 +1137,7 @@ echo '>>> cdk-plan-prd-all: Plan all stacks of prd: diff against what is deploye
 echo '--- CloudFormation console ---'
 echo 'agent-audit-prd-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-agentcore-deps&filteringStatus=active&viewNested=true'
 echo 'agent-audit-prd-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-web-invoker&filteringStatus=active&viewNested=true'
+echo 'agent-audit-prd-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-monitoring&filteringStatus=active&viewNested=true'
 echo '--- Run command ---'
 echo 'cdk diff --all --method auto --profile {{env.AWS_PROFILE_FOR_PRD}}'
 cdk diff --all --method auto --profile {{env.AWS_PROFILE_FOR_PRD}}
@@ -1031,6 +1153,7 @@ echo '>>> cdk-up-prd-all: Deploy all stacks of prd (no approval prompt)'
 echo '--- CloudFormation console ---'
 echo 'agent-audit-prd-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-agentcore-deps&filteringStatus=active&viewNested=true'
 echo 'agent-audit-prd-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-web-invoker&filteringStatus=active&viewNested=true'
+echo 'agent-audit-prd-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-monitoring&filteringStatus=active&viewNested=true'
 echo '--- Run command ---'
 echo 'cdk deploy --all --require-approval never --profile {{env.AWS_PROFILE_FOR_PRD}}'
 cdk deploy --all --require-approval never --profile {{env.AWS_PROFILE_FOR_PRD}}
@@ -1046,6 +1169,7 @@ echo '>>> cdk-down-prd-all: Destroy all stacks of prd (force, no confirmation)'
 echo '--- CloudFormation console ---'
 echo 'agent-audit-prd-agentcore-deps: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-agentcore-deps&filteringStatus=active&viewNested=true'
 echo 'agent-audit-prd-web-invoker: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-web-invoker&filteringStatus=active&viewNested=true'
+echo 'agent-audit-prd-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-monitoring&filteringStatus=active&viewNested=true'
 echo '--- Run command ---'
 echo 'cdk destroy --all --force --profile {{env.AWS_PROFILE_FOR_PRD}}'
 cdk destroy --all --force --profile {{env.AWS_PROFILE_FOR_PRD}}
@@ -1161,6 +1285,62 @@ echo 'agent-audit-prd-web-invoker: https://us-east-1.console.aws.amazon.com/clou
 echo '--- Run command ---'
 echo 'cdk destroy agent-audit-prd-web-invoker --exclusively --force --profile {{env.AWS_PROFILE_FOR_PRD}}'
 cdk destroy agent-audit-prd-web-invoker --exclusively --force --profile {{env.AWS_PROFILE_FOR_PRD}}
+"""
+
+[tasks."cdk-synth-prd-monitoring-stack"]
+description = "⚪ Synthesize stack monitoring of prd to CloudFormation templates (no AWS call)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-synth-prd-monitoring-stack: Synthesize stack monitoring of prd to CloudFormation templates (no AWS call)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-monitoring&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk synth agent-audit-prd-monitoring --exclusively'
+cdk synth agent-audit-prd-monitoring --exclusively
+"""
+
+[tasks."cdk-plan-prd-monitoring-stack"]
+description = "🔵 Plan stack monitoring of prd: diff against what is deployed, through a CloudFormation change set (no deploy)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-plan-prd-monitoring-stack: Plan stack monitoring of prd: diff against what is deployed, through a CloudFormation change set (no deploy)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-monitoring&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk diff agent-audit-prd-monitoring --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_PRD}}'
+cdk diff agent-audit-prd-monitoring --exclusively --method auto --profile {{env.AWS_PROFILE_FOR_PRD}}
+"""
+
+[tasks."cdk-up-prd-monitoring-stack"]
+description = "🟢 Deploy stack monitoring of prd (no approval prompt)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-up-prd-monitoring-stack: Deploy stack monitoring of prd (no approval prompt)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-monitoring&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk deploy agent-audit-prd-monitoring --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_PRD}}'
+cdk deploy agent-audit-prd-monitoring --exclusively --require-approval never --profile {{env.AWS_PROFILE_FOR_PRD}}
+"""
+
+[tasks."cdk-down-prd-monitoring-stack"]
+description = "🔴 Destroy stack monitoring of prd (force, no confirmation)"
+dir = "cdk"
+env = { ENV_NAME = "prd" }
+depends = ["inst"]
+run = """
+echo '>>> cdk-down-prd-monitoring-stack: Destroy stack monitoring of prd (force, no confirmation)'
+echo '--- CloudFormation console ---'
+echo 'agent-audit-prd-monitoring: https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?filteringText=agent-audit-prd-monitoring&filteringStatus=active&viewNested=true'
+echo '--- Run command ---'
+echo 'cdk destroy agent-audit-prd-monitoring --exclusively --force --profile {{env.AWS_PROFILE_FOR_PRD}}'
+cdk destroy agent-audit-prd-monitoring --exclusively --force --profile {{env.AWS_PROFILE_FOR_PRD}}
 """
 
 [tasks."config-deploy-all"]
